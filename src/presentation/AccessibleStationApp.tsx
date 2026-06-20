@@ -1,8 +1,23 @@
 "use client";
 
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Clock3,
+  Info,
+  MapPin,
+  Megaphone,
+  RefreshCw,
+  Search,
+  Star,
+  Trash2,
+  Volume2,
+  XCircle,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { Announcement, BoardItem, BoardType, Station } from "@/domain/types";
 import { nearbyStations, searchStations, stationAnnouncements, stationBoard } from "./apiClient";
+import { ThemeControls } from "./ThemeControls";
 import { useFavorites } from "./useFavorites";
 
 type Tab = BoardType | "announcements";
@@ -20,6 +35,26 @@ const statusLabel: Record<BoardItem["status"], string> = {
   cancelled: "Supprime",
   disrupted: "Perturbe",
   unknown: "Non confirme",
+};
+
+const priorityLabel: Record<Announcement["priority"], string> = {
+  critical: "Priorite haute",
+  warning: "A surveiller",
+  info: "Information",
+};
+
+const StatusIcon = ({ status }: { status: BoardItem["status"] }) => {
+  if (status === "cancelled") return <XCircle aria-hidden="true" />;
+  if (status === "delayed") return <Clock3 aria-hidden="true" />;
+  if (status === "disrupted") return <AlertTriangle aria-hidden="true" />;
+  if (status === "on_time") return <CheckCircle2 aria-hidden="true" />;
+  return <Info aria-hidden="true" />;
+};
+
+const PriorityIcon = ({ priority }: { priority: Announcement["priority"] }) => {
+  if (priority === "critical") return <AlertTriangle aria-hidden="true" />;
+  if (priority === "warning") return <Info aria-hidden="true" />;
+  return <Megaphone aria-hidden="true" />;
 };
 
 export function AccessibleStationApp() {
@@ -112,7 +147,10 @@ export function AccessibleStationApp() {
   return (
     <div className="page">
       <header className="hero">
-        <p className="kicker">SNCF accessible</p>
+        <div className="hero-topline">
+          <p className="kicker">SNCF accessible</p>
+          <ThemeControls />
+        </div>
         <h1>Les informations de gare, lisibles et disponibles sur mobile</h1>
         <p className="lead">
           Recherchez une gare, consultez les departs, arrivees, retards et annonces textuelles
@@ -124,12 +162,16 @@ export function AccessibleStationApp() {
         <h2 id="recherche-title">Choisir une gare</h2>
         <div className="toolbar">
           <button className="button" type="button" onClick={findNearby}>
-            Autour de moi
+            <span className="button-content">
+              <MapPin aria-hidden="true" />
+              <span>Autour de moi</span>
+            </span>
           </button>
         </div>
         <div className="field">
           <label htmlFor="station-search">Nom de gare</label>
           <div className="search-row">
+            <Search className="input-icon" aria-hidden="true" />
             <input
               id="station-search"
               value={query}
@@ -183,7 +225,10 @@ export function AccessibleStationApp() {
                   aria-label={`Retirer ${station.name} des favoris`}
                   onClick={() => removeFavorite(station.id)}
                 >
-                  X
+                  <span className="button-content">
+                    <Trash2 aria-hidden="true" />
+                    <span>Retirer</span>
+                  </span>
                 </button>
               </li>
             ))}
@@ -200,7 +245,10 @@ export function AccessibleStationApp() {
             </div>
             <div className="toolbar">
               <button className="button-secondary" type="button" onClick={refresh}>
-                Actualiser
+                <span className="button-content">
+                  <RefreshCw aria-hidden="true" />
+                  <span>Actualiser</span>
+                </span>
               </button>
               <button
                 className="button-secondary"
@@ -211,7 +259,10 @@ export function AccessibleStationApp() {
                     : addFavorite(selectedStation)
                 }
               >
-                {isFavorite(selectedStation.id) ? "Retirer favori" : "Ajouter favori"}
+                <span className="button-content">
+                  <Star aria-hidden="true" />
+                  <span>{isFavorite(selectedStation.id) ? "Retirer favori" : "Ajouter favori"}</span>
+                </span>
               </button>
             </div>
           </div>
@@ -277,7 +328,10 @@ function BoardList({ items }: { items: BoardItem[] }) {
             {item.trainNumber && <span className="tag">Train {item.trainNumber}</span>}
             <span className="tag">Voie {item.platform ?? "non communiquee"}</span>
             <span className={`tag ${item.status === "cancelled" ? "danger" : item.status === "delayed" || item.status === "disrupted" ? "warning" : ""}`}>
-              {statusLabel[item.status]}
+              <span className="tag-content">
+                <StatusIcon status={item.status} />
+                <span>{statusLabel[item.status]}</span>
+              </span>
             </span>
           </div>
           {item.disruptions.map((disruption) => (
@@ -304,9 +358,16 @@ function AnnouncementList({ announcements }: { announcements: Announcement[] }) 
     <ul className="announcement-list" aria-label="Annonces textuelles">
       {announcements.map((announcement) => (
         <li className="announcement" key={announcement.id} data-priority={announcement.priority}>
+          <p className="announcement-priority">
+            <PriorityIcon priority={announcement.priority} />
+            <span>{priorityLabel[announcement.priority]}</span>
+          </p>
           <p>{announcement.text}</p>
           <button className="button-secondary" type="button" onClick={() => speak(announcement.text)}>
-            Lire
+            <span className="button-content">
+              <Volume2 aria-hidden="true" />
+              <span>Lire</span>
+            </span>
           </button>
         </li>
       ))}

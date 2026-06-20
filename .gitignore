@@ -2,6 +2,7 @@ node_modules
 .next
 out
 coverage
+.lighthouseci
 playwright-report
 test-results
 .env

@@ -38,6 +38,11 @@ jobs:
       - name: Install Playwright
         run: npx playwright install --with-deps chromium
 
+      - name: Lighthouse accessibility score
+        run: npm run test:a11y:score:ci
+        env:
+          SNCF_API_TOKEN: ci-placeholder
+
       - name: E2E non-regression
         run: npm run test:e2e
         env:

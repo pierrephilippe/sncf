@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { AppThemeProvider } from "@/presentation/AppThemeProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,17 +11,19 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#003b5c",
+  themeColor: "#111111",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr">
+    <html lang="fr" data-theme="achromatopsia" suppressHydrationWarning>
       <body>
-        <a className="skip-link" href="#contenu">
-          Aller au contenu
-        </a>
-        {children}
+        <AppThemeProvider>
+          <a className="skip-link" href="#contenu">
+            Aller au contenu
+          </a>
+          {children}
+        </AppThemeProvider>
       </body>
     </html>
   );
