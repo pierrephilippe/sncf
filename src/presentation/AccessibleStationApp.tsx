@@ -134,12 +134,32 @@ const mergeById = <T extends { id: string }>(current: T[], next: T[]): T[] => {
   return [...current, ...next.filter((item) => !knownIds.has(item.id))];
 };
 
-const sameStationName = (left: string | undefined, right: string | undefined): boolean =>
-  Boolean(left && right && left.trim().toLocaleLowerCase("fr-FR") === right.trim().toLocaleLowerCase("fr-FR"));
+const normalizeStationName = (value: string | undefined): string =>
+  value
+    ?.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/^gare\s+(de|d')\s+/i, "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("fr-FR") ?? "";
+
+const sameStationName = (left: string | undefined, right: string | undefined): boolean => {
+  const normalizedLeft = normalizeStationName(left);
+  const normalizedRight = normalizeStationName(right);
+  return Boolean(normalizedLeft && normalizedRight && normalizedLeft === normalizedRight);
+};
 
 const knownDifferentStation = (candidate: string | undefined, stationName: string): string | undefined => {
   if (!candidate || sameStationName(candidate, stationName)) return undefined;
   return candidate;
+};
+
+const splitRouteLabel = (routeLabel: string | undefined): [string, string] | null => {
+  const parts = routeLabel?.split(/\s[-–—]\s/).map((part) => part.trim()).filter(Boolean);
+  if (!parts || parts.length < 2) return null;
+  return [parts[0], parts[parts.length - 1]];
 };
 
 const isStation = (value: unknown): value is Station =>
@@ -381,28 +401,32 @@ export function AccessibleStationApp() {
     try {
       if (activeTab === "announcements") {
         const items = await stationAnnouncements(selectedStation.id, { fromDateTime, page: nextPage });
-        setAnnouncements((current) => mergeById(current, items));
+        const mergedAnnouncements = mergeById(announcements, items);
+        const addedItemCount = mergedAnnouncements.length - announcements.length;
+        setAnnouncements(mergedAnnouncements);
         setPaging((state) => ({
           ...state,
           announcements: {
             fromDateTime,
             page: nextPage,
-            hasMore: items.length === PAGE_SIZE,
+            hasMore: items.length === PAGE_SIZE && addedItemCount > 0,
             isLoadingMore: false,
           },
         }));
       } else {
         const items = await stationBoard(selectedStation.id, activeTab, { fromDateTime, page: nextPage });
+        const mergedBoard = mergeById(boards[activeTab], items);
+        const addedItemCount = mergedBoard.length - boards[activeTab].length;
         setBoards((currentBoards) => ({
           ...currentBoards,
-          [activeTab]: mergeById(currentBoards[activeTab], items),
+          [activeTab]: mergedBoard,
         }));
         setPaging((state) => ({
           ...state,
           [activeTab]: {
             fromDateTime,
             page: nextPage,
-            hasMore: items.length === PAGE_SIZE,
+            hasMore: items.length === PAGE_SIZE && addedItemCount > 0,
             isLoadingMore: false,
           },
         }));
@@ -759,7 +783,9 @@ function BoardList({
           <div className="board-topline">
             <div>
               <p className="destination">
-                {type === "arrivals" ? item.origin ?? "Gare de depart non communiquee" : item.destination}
+                {type === "arrivals"
+                  ? item.origin ?? "Gare de depart non communiquee"
+                  : item.destination ?? "Destination non communiquee"}
               </p>
               <p className="muted">{item.line ?? "Ligne non communiquee"}</p>
             </div>
@@ -771,7 +797,7 @@ function BoardList({
             <span className="tag">
               {type === "arrivals"
                 ? `Depart ${item.origin ?? "non communique"}`
-                : `Destination ${item.destination}`}
+                : `Destination ${item.destination ?? "non communiquee"}`}
             </span>
             {item.trainNumber && <span className="tag">Train {item.trainNumber}</span>}
             <span className="tag">Voie {item.platform ?? "non communiquee"}</span>
@@ -815,12 +841,17 @@ function TrainTrackingView({
   const { item, type, station, updatedAt } = trackedTrain;
   const firstServedStation = item.servedStations?.[0];
   const lastServedStation = item.servedStations?.at(-1);
+  const routeLabelPlaces = splitRouteLabel(item.routeLabel);
   const departurePlace = type === "arrivals"
-    ? knownDifferentStation(firstServedStation, station.name) ?? knownDifferentStation(item.origin, station.name)
+    ? knownDifferentStation(firstServedStation, station.name) ??
+      knownDifferentStation(routeLabelPlaces?.[0], station.name) ??
+      knownDifferentStation(item.origin, station.name)
     : station.name;
   const arrivalPlace = type === "arrivals"
     ? station.name
-    : knownDifferentStation(lastServedStation, station.name) ?? knownDifferentStation(item.destination, station.name);
+    : knownDifferentStation(lastServedStation, station.name) ??
+      knownDifferentStation(routeLabelPlaces?.[1], station.name) ??
+      knownDifferentStation(item.destination, station.name);
   const trainName = [item.line, item.trainNumber ? `Train ${item.trainNumber}` : undefined]
     .filter(Boolean)
     .join(" - ") || "Train suivi";

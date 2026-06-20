@@ -59,7 +59,7 @@ export class AnnouncementService {
       ? `. Information: ${item.disruptions[0].title}.`
       : ".";
 
-    return `${train}${line} vers ${item.destination}, depart ${formatTime(
+    return `${train}${line} vers ${item.destination ?? "destination non communiquee"}, depart ${formatTime(
       item.time,
     )}${platform}, ${statusText(item)}${disruption}`;
   }

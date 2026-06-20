@@ -38,7 +38,7 @@ export type BoardItem = {
   id: string;
   time: string;
   expectedTime?: string;
-  destination: string;
+  destination?: string;
   origin?: string;
   servedStations?: string[];
   coachPositions?: Array<{
@@ -46,6 +46,7 @@ export type BoardItem = {
     marker: string;
   }>;
   line?: string;
+  routeLabel?: string;
   trainNumber?: string;
   platform?: string;
   status: TrainStatus;

@@ -319,6 +319,7 @@ test("les departs se chargent depuis maintenant moins cinq minutes avec paginati
 
   await page.getByRole("button", { name: "Charger plus" }).click();
   await expect(page.getByText("Destination 22", { exact: true })).toBeVisible();
+  await expect(page.getByText("Tous les resultats disponibles sont affiches.")).toBeVisible();
   expect(requestedPages).toContain("1");
   expect(requestedFromDateTimes[1]).toBe(requestedFromDateTimes[0]);
 });
@@ -449,6 +450,101 @@ test("un rechargement navigateur conserve la page detail du train suivi", async 
   await expect(page.getByRole("heading", { level: 2, name: "TER - Train 876543" })).toBeVisible();
   await expect(page.getByLabel("Heure de depart")).toContainText("14:08");
   await expect(page.getByRole("tab", { name: "Departs" })).not.toBeVisible();
+});
+
+test("la page detail n'affiche pas une arrivee identique a la gare selectionnee", async ({ page }) => {
+  await page.route("**/api/stations/search**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "stop_area:SNCF:87723197",
+          name: "Lyon Part Dieu",
+          city: "Lyon",
+          source: "sncf",
+        },
+      ]),
+    });
+  });
+
+  await page.route("**/api/stations/*/board**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "departure-same-station",
+          time: "2026-06-20T14:08:00+02:00",
+          destination: "Lyon Part-Dieu (Lyon)",
+          line: "TGV INOUI",
+          trainNumber: "876543",
+          platform: "2",
+          status: "on_time",
+          disruptions: [],
+        },
+      ]),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Nom de gare").fill("Lyon");
+  await page.getByRole("button", { name: /lyon part dieu/i }).click();
+  await page.getByRole("button", { name: "Suivre le train 876543" }).click();
+
+  const routeCards = page.locator(".tracking-route-cards");
+  await expect(routeCards.getByText("Depart")).toBeVisible();
+  await expect(routeCards.getByText("Lyon Part Dieu")).toBeVisible();
+  await expect(routeCards.getByText("Arrivee")).toBeVisible();
+  await expect(routeCards.getByText("Non communique")).toBeVisible();
+  await expect(routeCards.getByText("Lyon Part-Dieu (Lyon)")).not.toBeVisible();
+});
+
+test("un libelle de trajet sert au trajet mais pas au nom du train", async ({ page }) => {
+  await page.route("**/api/stations/search**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "stop_area:SNCF:87113001",
+          name: "Frankfurt am Main Hbf",
+          city: "Frankfurt",
+          source: "sncf",
+        },
+      ]),
+    });
+  });
+
+  await page.route("**/api/stations/*/board**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "departure-route-label",
+          time: "2026-06-20T14:08:00+02:00",
+          destination: "Non communique",
+          routeLabel: "Frankfurt am Main Hbf - Paris Est",
+          trainNumber: "9560",
+          platform: "2",
+          status: "on_time",
+          disruptions: [],
+        },
+      ]),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Nom de gare").fill("Frankfurt");
+  await page.getByRole("button", { name: /frankfurt am main hbf/i }).click();
+  await page.getByRole("button", { name: "Suivre le train 9560" }).click();
+
+  const routeCards = page.locator(".tracking-route-cards");
+  await expect(routeCards.getByText("Frankfurt am Main Hbf")).toBeVisible();
+  await expect(routeCards.getByText("Paris Est")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Train 9560" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2 })).not.toContainText("Frankfurt am Main Hbf - Paris Est");
 });
 
 test("le menu fixe reste stable au scroll avec la barre d'actions", async ({ page }) => {

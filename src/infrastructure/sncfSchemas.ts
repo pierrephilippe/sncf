@@ -57,10 +57,12 @@ const disruptionSchema = z.object({
 
 const displayInformationSchema = z.object({
   code: z.string().optional(),
+  commercial_mode: z.string().optional(),
   direction: z.string().optional(),
   headsign: z.string().optional(),
   label: z.string().optional(),
   name: z.string().optional(),
+  physical_mode: z.string().optional(),
 });
 
 const stopDateTimeSchema = z.object({
@@ -77,6 +79,7 @@ const boardEntrySchema = z.object({
   stop_date_time: stopDateTimeSchema,
   route: z
     .object({
+      name: z.string().optional(),
       stop_points: z.array(stopPointSchema).optional(),
     })
     .optional(),

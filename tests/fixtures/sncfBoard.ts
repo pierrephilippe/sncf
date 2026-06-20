@@ -5,8 +5,8 @@ export const delayedDepartureFixture: BoardResponse = {
     {
       display_informations: {
         code: "876543",
+        commercial_mode: "TER",
         direction: "Lyon Part Dieu",
-        label: "TER",
       },
       stop_date_time: {
         base_departure_date_time: "20260620T140800",
@@ -29,8 +29,8 @@ export const arrivalFixture: BoardResponse = {
     {
       display_informations: {
         code: "123456",
+        commercial_mode: "TGV INOUI",
         direction: "Marseille Saint-Charles",
-        label: "TGV INOUI",
       },
       stop_date_time: {
         base_arrival_date_time: "20260620T160500",

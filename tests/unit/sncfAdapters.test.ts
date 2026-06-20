@@ -16,7 +16,8 @@ describe("SncfBoardAdapter", () => {
     const [item] = new SncfBoardAdapter().fromBoard(arrivalFixture, "arrivals");
 
     expect(item.origin).toBe("Marseille Saint-Charles");
-    expect(item.destination).toBe("Cette gare");
+    expect(item.destination).toBeUndefined();
+    expect(item.line).toBe("TGV INOUI");
     expect(item.trainNumber).toBe("123456");
     expect(item.status).toBe("on_time");
   });
@@ -97,5 +98,53 @@ describe("SncfBoardAdapter", () => {
     );
 
     expect(item.servedStations).toEqual(["Marseille Saint-Charles", "Avignon TGV", "Lyon Part Dieu"]);
+  });
+
+  it("ne confond pas un libelle de trajet avec le type du train", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        departures: [
+          {
+            display_informations: {
+              code: "9560",
+              label: "Frankfurt am Main Hbf - Paris Est",
+              direction: "Paris Est",
+            },
+            stop_date_time: {
+              base_departure_date_time: "20260620T140800",
+              departure_date_time: "20260620T140800",
+            },
+          },
+        ],
+      },
+      "departures",
+    );
+
+    expect(item.line).toBeUndefined();
+    expect(item.routeLabel).toBe("Frankfurt am Main Hbf - Paris Est");
+  });
+
+  it("utilise commercial_mode comme type du train quand il est fourni", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        departures: [
+          {
+            display_informations: {
+              code: "9560",
+              commercial_mode: "TGV INOUI",
+              direction: "Paris Est",
+            },
+            stop_date_time: {
+              base_departure_date_time: "20260620T140800",
+              departure_date_time: "20260620T140800",
+            },
+          },
+        ],
+      },
+      "departures",
+    );
+
+    expect(item.line).toBe("TGV INOUI");
+    expect(item.routeLabel).toBeUndefined();
   });
 });

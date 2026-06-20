@@ -6,6 +6,18 @@ const compact = (value: string | undefined): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
+const looksLikeRouteLabel = (value: string | undefined): boolean =>
+  Boolean(value && /\s[-–—]\s/.test(value));
+
+const trainNumberFromDisplay = (code?: string, headsign?: string): string | undefined => {
+  const compactHeadsign = compact(headsign);
+  if (compactHeadsign && /^\d+[A-Z]?$/i.test(compactHeadsign)) return compactHeadsign;
+  return compact(code);
+};
+
+const routeLabelFromDisplay = (...values: Array<string | undefined>): string | undefined =>
+  values.map(compact).find(looksLikeRouteLabel);
+
 export class SncfStationAdapter {
   fromPlaces(response: PlacesResponse): Station[] {
     return response.places
@@ -52,20 +64,22 @@ export class SncfBoardAdapter {
       const realtimeTime =
         type === "departures" ? stopDate.departure_date_time : stopDate.arrival_date_time;
       const linkedDisruptions = mapLinkedDisruptions(stopDate.links, disruptions);
+      const routeLabel = routeLabelFromDisplay(display?.label, display?.name, entry.route?.name);
 
       return {
         id: `${type}-${display?.code ?? "train"}-${realtimeTime ?? baseTime ?? "time-unknown"}-${index}`,
         time: toIsoDate(baseTime ?? realtimeTime),
         expectedTime: realtimeTime && realtimeTime !== baseTime ? toIsoDate(realtimeTime) : undefined,
         destination: type === "departures"
-          ? compact(display?.direction) ?? compact(display?.headsign) ?? "Destination non communiquee"
-          : "Cette gare",
+          ? compact(display?.direction)
+          : undefined,
         origin: type === "arrivals"
-          ? compact(display?.direction) ?? compact(display?.headsign) ?? "Gare de depart non communiquee"
+          ? compact(display?.direction)
           : undefined,
         servedStations: mapServedStations(entry.route?.stop_points),
-        line: compact(display?.label) ?? compact(display?.name),
-        trainNumber: compact(display?.code),
+        line: compact(display?.commercial_mode) ?? compact(display?.physical_mode),
+        routeLabel,
+        trainNumber: trainNumberFromDisplay(display?.code, display?.headsign),
         platform: undefined,
         status: inferStatus(baseTime, realtimeTime, linkedDisruptions),
         disruptions: linkedDisruptions,
