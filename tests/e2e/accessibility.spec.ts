@@ -403,6 +403,68 @@ test("un train peut etre suivi puis actualise sur une page dediee", async ({ pag
   await expect(page.getByRole("button", { name: "Suivre le train 876543" })).toBeVisible();
 });
 
+test("une erreur d'actualisation du train suivi reste visible sur la page detail", async ({ page }) => {
+  let boardCalls = 0;
+
+  await page.route("**/api/stations/search**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "stop_area:SNCF:87723197",
+          name: "Lyon Part Dieu",
+          city: "Lyon",
+          source: "sncf",
+        },
+      ]),
+    });
+  });
+
+  await page.route("**/api/stations/*/board**", async (route) => {
+    boardCalls += 1;
+    if (boardCalls > 1) {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "API SNCF indisponible", code: "external_api" }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "departure-error",
+          time: "2026-06-20T14:08:00+02:00",
+          destination: "Paris Gare de Lyon",
+          line: "TER",
+          trainNumber: "876543",
+          platform: "2",
+          status: "on_time",
+          disruptions: [],
+        },
+      ]),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Nom de gare").fill("Lyon");
+  await page.getByRole("button", { name: /lyon part dieu/i }).click();
+  await page.getByRole("button", { name: "Suivre le train 876543" }).click();
+  await expect(page.getByText(/Derniere actualisation/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Actualiser" }).click();
+
+  const updateError = page.getByRole("alert", { name: "Erreur de mise a jour" });
+  await expect(updateError).toBeVisible();
+  await expect(updateError).toContainText("Actualisation impossible");
+  await expect(updateError).toContainText("API SNCF indisponible");
+  await expect(updateError).toContainText("Les informations affichees ne sont pas confirmees");
+});
+
 test("un rechargement navigateur conserve la page detail du train suivi", async ({ page }) => {
   await page.route("**/api/stations/search**", async (route) => {
     await route.fulfill({

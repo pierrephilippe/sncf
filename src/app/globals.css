@@ -626,7 +626,20 @@ input {
   background: var(--surface-strong);
 }
 
+.tracking-error {
+  display: grid;
+  gap: 0.35rem;
+  border: 3px double var(--danger);
+  border-radius: 6px;
+  padding: 0.7rem;
+  background: var(--surface-strong);
+}
+
 .tracking-alert p {
+  margin: 0;
+}
+
+.tracking-error p {
   margin: 0;
 }
 

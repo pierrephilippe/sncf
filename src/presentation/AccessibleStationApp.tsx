@@ -715,6 +715,7 @@ export function AccessibleStationApp() {
           {trackedTrain ? (
             <TrainTrackingView
               trackedTrain={trackedTrain}
+              error={error}
               onBack={() => setTrackedTrain(null)}
               onRefresh={refreshTrackedTrain}
             />
@@ -812,10 +813,12 @@ function BoardList({
 
 function TrainTrackingView({
   trackedTrain,
+  error,
   onBack,
   onRefresh,
 }: {
   trackedTrain: TrackedTrain;
+  error: string;
   onBack: () => void;
   onRefresh: () => void;
 }) {
@@ -860,6 +863,17 @@ function TrainTrackingView({
           </span>
         </button>
       </div>
+
+      {error && (
+        <section className="tracking-error" role="alert" aria-label="Erreur de mise a jour">
+          <p className="tracking-alert-title">
+            <AlertTriangle aria-hidden="true" />
+            <span>Actualisation impossible</span>
+          </p>
+          <p>{error}</p>
+          <p>Les informations affichees ne sont pas confirmees par une nouvelle mise a jour.</p>
+        </section>
+      )}
 
       <header className="tracking-header">
         <div className="tracking-train-identity" aria-label="Train">
