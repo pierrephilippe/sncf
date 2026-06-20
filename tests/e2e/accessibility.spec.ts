@@ -9,8 +9,16 @@ test("accueil mobile accessible sans violation axe critique", async ({ page }) =
   expect(results.violations).toEqual([]);
 });
 
-test("la recherche expose un message d'erreur accessible si l'API n'est pas configuree", async ({ page }) => {
+test("la recherche expose un message d'erreur accessible si l'API est indisponible", async ({ page }) => {
+  await page.route("**/api/stations/search**", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "API indisponible", code: "external_api" }),
+    });
+  });
+
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
-  await expect(page.getByRole("status")).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("API indisponible");
 });

@@ -10,7 +10,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Renseigner `SNCF_API_TOKEN` avec un jeton `https://api.sncf.com/v1`. Sur Netlify, la variable doit etre configuree cote Functions uniquement.
+Renseigner `SNCF_API_TOKEN` avec un jeton SNCF API. Sur Netlify, la variable doit etre configuree cote Functions uniquement. `SNCF_API_BASE_URL` est optionnelle: le code utilise l'URL SNCF API v1 par defaut.
 
 ## Scripts
 

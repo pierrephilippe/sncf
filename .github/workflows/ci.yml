@@ -33,7 +33,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          SNCF_API_BASE_URL: https://api.sncf.com/v1
           SNCF_API_TOKEN: ci-placeholder
 
       - name: Install Playwright
@@ -42,5 +41,4 @@ jobs:
       - name: E2E non-regression
         run: npm run test:e2e
         env:
-          SNCF_API_BASE_URL: https://api.sncf.com/v1
           SNCF_API_TOKEN: ci-placeholder
