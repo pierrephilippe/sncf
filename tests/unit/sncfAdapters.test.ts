@@ -147,4 +147,49 @@ describe("SncfBoardAdapter", () => {
     expect(item.line).toBe("TGV INOUI");
     expect(item.routeLabel).toBeUndefined();
   });
+
+  it("conserve l'identifiant vehicle_journey quand l'API le fournit", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        departures: [
+          {
+            display_informations: {
+              code: "9560",
+              direction: "Paris Est",
+            },
+            stop_date_time: {
+              base_departure_date_time: "20260620T140800",
+              departure_date_time: "20260620T140800",
+              links: [
+                { type: "vehicle_journey", id: "vehicle_journey:SNCF:9560" },
+              ],
+            },
+          },
+        ],
+      },
+      "departures",
+    );
+
+    expect(item.vehicleJourneyId).toBe("vehicle_journey:SNCF:9560");
+  });
+
+  it("extrait les gares desservies depuis le detail vehicle_journey", () => {
+    const details = new SncfBoardAdapter().fromVehicleJourney({
+      vehicle_journeys: [
+        {
+          stop_times: [
+            { stop_point: { name: "Frankfurt am Main Hbf" } },
+            { stop_point: { name: "Mannheim Hbf" } },
+            { stop_point: { name: "Paris Est" } },
+          ],
+        },
+      ],
+    });
+
+    expect(details.servedStations).toEqual([
+      "Frankfurt am Main Hbf",
+      "Mannheim Hbf",
+      "Paris Est",
+    ]);
+  });
 });

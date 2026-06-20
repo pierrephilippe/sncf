@@ -21,6 +21,8 @@ Les principaux risques identifies concernent surtout l'exposition publique des r
 | ARCH-001 | Moyen | Strategie d'erreur mixte `Result` puis exceptions dans les repositories | A evaluer | 2026-06-20 |
 | ARCH-002 | Moyen | `BoardItem` pourrait devenir un type discrimine depart/arrivee | A evaluer | 2026-06-20 |
 | DATA-001 | Faible | Favoris `localStorage` lus sans validation structuree | A traiter | 2026-06-20 |
+| DATA-002 | Moyen | Enrichissement origine/destination via `vehicle_journey` uniquement sur la page de suivi | Traite | 2026-06-20 |
+| ACC-001 | Important | Rendu homogene et explicite des erreurs API avec `role=alert` | Traite | 2026-06-20 |
 
 ## Constats detailles
 
@@ -61,6 +63,7 @@ Fichiers concernes :
 - `src/app/api/stations/nearby/route.ts`
 - `src/app/api/stations/[stationId]/board/route.ts`
 - `src/app/api/stations/[stationId]/announcements/route.ts`
+- `src/app/api/trains/[vehicleJourneyId]/route.ts`
 
 Impact :
 
@@ -72,6 +75,7 @@ Recommandation :
 - Si possible, utiliser une fonctionnalite Netlify adaptee au rate limiting.
 - A defaut, mettre en place un rate limiter applicatif simple par IP et route, en tenant compte des limites serverless.
 - Garder un cache court sur les donnees publiques de tableau.
+- Inclure la route `/api/trains/*`, car elle proxifie aussi l'API SNCF avec le token serveur.
 
 ### SEC-003 - Cache public sur la recherche autour de soi
 
@@ -212,6 +216,56 @@ Recommandation :
 - Valider les favoris lus avec Zod.
 - Supprimer la valeur stockee si le schema est invalide.
 - Limiter explicitement le nombre et la taille des champs stockes.
+
+### DATA-002 - Enrichissement du suivi de train
+
+Priorite : Moyen
+
+Statut : Traite le 2026-06-20
+
+Fichiers concernes :
+
+- `src/domain/types.ts`
+- `src/domain/ports.ts`
+- `src/application/useCases.ts`
+- `src/infrastructure/sncfAdapters.ts`
+- `src/infrastructure/repositories.ts`
+- `src/app/api/trains/[vehicleJourneyId]/route.ts`
+- `src/presentation/AccessibleStationApp.tsx`
+
+Decision :
+
+- Le tableau depart/arrivee conserve maintenant l'identifiant `vehicle_journey` quand `stop_date_time.links` le fournit.
+- L'appel supplementaire au detail du train est effectue uniquement sur la page "Suivre ce train".
+- Les informations enrichies ne remplacent que des champs effectivement fournis par l'API, principalement les gares desservies et le libelle de route.
+- Si le detail `vehicle_journey` ne fournit pas d'arrets, l'interface garde `Non communique` ou masque les sections optionnelles.
+
+Raison :
+
+Cette approche evite de multiplier les appels API sur les listes, limite le risque de quota, et respecte la regle produit : ne jamais inventer une origine, une destination ou une desserte.
+
+### ACC-001 - Rendu des erreurs API
+
+Priorite : Important
+
+Statut : Traite le 2026-06-20
+
+Fichiers concernes :
+
+- `src/presentation/AccessibleStationApp.tsx`
+- `src/app/globals.css`
+- `tests/e2e/accessibility.spec.ts`
+
+Decision :
+
+- Les erreurs API utilisent un composant visuel commun avec icone, titre, message et texte d'accompagnement.
+- Le composant est expose en `role=alert` pour les erreurs critiques.
+- La ligne `role=status` reste reservee aux messages non critiques, comme les mises a jour reussies.
+- Les tests E2E ciblent le nom accessible du bloc d'erreur pour eviter toute confusion avec l'annonceur interne de Next.js.
+
+Raison :
+
+Les erreurs ne doivent pas etre portees par une simple couleur ou une ligne de statut peu visible. Le rendu commun rend les pannes API plus lisibles, plus coherentes et mieux annoncees par les technologies d'assistance.
 
 ## Points positifs
 

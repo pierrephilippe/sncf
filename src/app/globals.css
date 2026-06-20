@@ -395,13 +395,6 @@ input {
   color: var(--muted);
 }
 
-.status.error {
-  color: var(--danger);
-  font-weight: 700;
-  text-decoration: underline;
-  text-decoration-thickness: 0.12em;
-}
-
 .refresh-button {
   white-space: nowrap;
 }
@@ -626,7 +619,11 @@ input {
   background: var(--surface-strong);
 }
 
-.tracking-error {
+.page-alert {
+  padding: 0 1rem 0.85rem;
+}
+
+.api-error-alert {
   display: grid;
   gap: 0.35rem;
   border: 3px double var(--danger);
@@ -639,7 +636,7 @@ input {
   margin: 0;
 }
 
-.tracking-error p {
+.api-error-alert p {
   margin: 0;
 }
 

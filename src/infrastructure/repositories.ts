@@ -1,4 +1,4 @@
-import type { BoardRepository, StationRepository } from "@/domain/ports";
+import type { BoardRepository, StationRepository, TrainDetailsRepository } from "@/domain/ports";
 import type { BoardItem, BoardQuery, BoardType, Coordinates, Station } from "@/domain/types";
 import type { SncfHttpClient } from "./sncfClient";
 import { SncfBoardAdapter, SncfStationAdapter } from "./sncfAdapters";
@@ -6,9 +6,11 @@ import {
   boardResponseSchema,
   nearbyResponseSchema,
   placesResponseSchema,
+  vehicleJourneyResponseSchema,
   type BoardResponse,
   type NearbyResponse,
   type PlacesResponse,
+  type VehicleJourneyResponse,
 } from "./sncfSchemas";
 
 export class SncfStationRepository implements StationRepository {
@@ -65,6 +67,26 @@ export class SncfBoardRepository implements BoardRepository {
     if (!response.ok) throw response.error;
 
     return this.adapter.fromBoard(boardResponseSchema.parse(response.value), type);
+  }
+}
+
+export class SncfTrainDetailsRepository implements TrainDetailsRepository {
+  constructor(
+    private readonly client: SncfHttpClient,
+    private readonly adapter: SncfBoardAdapter,
+  ) {}
+
+  async getTrainDetails(vehicleJourneyId: string): Promise<Partial<BoardItem>> {
+    const response = await this.client.get<VehicleJourneyResponse>(
+      `/coverage/sncf/vehicle_journeys/${encodeURIComponent(vehicleJourneyId)}`,
+      {
+        depth: 3,
+        data_freshness: "realtime",
+      },
+    );
+    if (!response.ok) throw response.error;
+
+    return this.adapter.fromVehicleJourney(vehicleJourneyResponseSchema.parse(response.value));
   }
 }
 

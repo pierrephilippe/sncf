@@ -36,6 +36,7 @@ export type Disruption = {
 
 export type BoardItem = {
   id: string;
+  vehicleJourneyId?: string;
   time: string;
   expectedTime?: string;
   destination?: string;

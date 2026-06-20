@@ -9,6 +9,10 @@ export interface BoardRepository {
   getBoard(stationId: string, type: BoardType, query?: BoardQuery): Promise<BoardItem[]>;
 }
 
+export interface TrainDetailsRepository {
+  getTrainDetails(vehicleJourneyId: string): Promise<Partial<BoardItem>>;
+}
+
 export interface StationAnnouncementService {
   forStation(stationId: string): Promise<Announcement[]>;
 }

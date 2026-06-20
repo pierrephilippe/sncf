@@ -21,7 +21,9 @@ test("la recherche expose un message d'erreur accessible si l'API est indisponib
 
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
-  await expect(page.getByRole("status")).toContainText("API indisponible");
+  const apiError = page.getByRole("alert", { name: "Service indisponible" });
+  await expect(apiError).toContainText("API indisponible");
+  await expect(apiError).toContainText("Service indisponible");
 });
 
 test("une panne reseau affiche un message francais explicite", async ({ page }) => {
@@ -31,8 +33,9 @@ test("une panne reseau affiche un message francais explicite", async ({ page }) 
 
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
-  await expect(page.getByRole("status")).toContainText("Connexion impossible");
-  await expect(page.getByRole("status")).not.toContainText("Failed to fetch");
+  const apiError = page.getByRole("alert", { name: "Service indisponible" });
+  await expect(apiError).toContainText("Connexion impossible");
+  await expect(apiError).not.toContainText("Failed to fetch");
 });
 
 test("les suggestions de gares restent lisibles et sans violation axe", async ({ page }) => {
@@ -458,7 +461,7 @@ test("une erreur d'actualisation du train suivi reste visible sur la page detail
 
   await page.getByRole("button", { name: "Actualiser" }).click();
 
-  const updateError = page.getByRole("alert", { name: "Erreur de mise a jour" });
+  const updateError = page.getByRole("alert", { name: "Actualisation impossible" });
   await expect(updateError).toBeVisible();
   await expect(updateError).toContainText("Actualisation impossible");
   await expect(updateError).toContainText("API SNCF indisponible");

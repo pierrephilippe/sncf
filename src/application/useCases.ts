@@ -1,4 +1,4 @@
-import type { BoardRepository, StationRepository } from "@/domain/ports";
+import type { BoardRepository, StationRepository, TrainDetailsRepository } from "@/domain/ports";
 import { AnnouncementService } from "@/domain/announcements";
 import type { Announcement, BoardItem, BoardQuery, BoardType, Coordinates, Station } from "@/domain/types";
 
@@ -23,6 +23,14 @@ export class GetStationBoardUseCase {
 
   execute(stationId: string, type: BoardType, query?: BoardQuery): Promise<BoardItem[]> {
     return this.boards.getBoard(stationId, type, query);
+  }
+}
+
+export class GetTrainDetailsUseCase {
+  constructor(private readonly trains: TrainDetailsRepository) {}
+
+  execute(vehicleJourneyId: string): Promise<Partial<BoardItem>> {
+    return this.trains.getTrainDetails(vehicleJourneyId);
   }
 }
 

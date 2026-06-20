@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Announcement, BoardItem, BoardType, Station } from "@/domain/types";
-import { nearbyStations, searchStations, stationAnnouncements, stationBoard } from "./apiClient";
+import { nearbyStations, searchStations, stationAnnouncements, stationBoard, trainDetails } from "./apiClient";
 import { useFavorites } from "./useFavorites";
 
 type Tab = BoardType | "announcements";
@@ -134,6 +134,12 @@ const mergeById = <T extends { id: string }>(current: T[], next: T[]): T[] => {
   return [...current, ...next.filter((item) => !knownIds.has(item.id))];
 };
 
+const mergeTrainDetails = (item: BoardItem, details: Partial<BoardItem>): BoardItem => ({
+  ...item,
+  ...(details.servedStations && details.servedStations.length > 0 ? { servedStations: details.servedStations } : {}),
+  ...(details.routeLabel ? { routeLabel: details.routeLabel } : {}),
+});
+
 const normalizeStationName = (value: string | undefined): string =>
   value
     ?.normalize("NFD")
@@ -248,6 +254,7 @@ export function AccessibleStationApp() {
   const [searchMode, setSearchMode] = useState<SearchMode>(initialNavigation?.searchMode ?? "text");
   const [trackedTrain, setTrackedTrain] = useState<TrackedTrain | null>(initialNavigation?.trackedTrain ?? null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const attemptedTrainDetailsRef = useRef<Set<string>>(new Set());
   const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
 
   useEffect(() => {
@@ -313,6 +320,30 @@ export function AccessibleStationApp() {
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStation, trackedTrain, activeTab, paging]);
+
+  useEffect(() => {
+    const vehicleJourneyId = trackedTrain?.item.vehicleJourneyId;
+    if (!vehicleJourneyId || attemptedTrainDetailsRef.current.has(vehicleJourneyId)) return;
+
+    attemptedTrainDetailsRef.current.add(vehicleJourneyId);
+
+    const enrichTrackedTrain = async () => {
+      try {
+        const details = await trainDetails(vehicleJourneyId);
+        setTrackedTrain((currentTrackedTrain) => currentTrackedTrain?.item.vehicleJourneyId === vehicleJourneyId
+          ? {
+              ...currentTrackedTrain,
+              item: mergeTrainDetails(currentTrackedTrain.item, details),
+            }
+          : currentTrackedTrain);
+      } catch (cause) {
+        setError(readableError(cause, "Detail du train indisponible. Les informations affichees restent celles du tableau."));
+        setStatus("");
+      }
+    };
+
+    void enrichTrackedTrain();
+  }, [trackedTrain?.item.vehicleJourneyId]);
 
   const refresh = async () => {
     if (!selectedStation) return;
@@ -516,9 +547,13 @@ export function AccessibleStationApp() {
         return;
       }
 
+      const enrichedItem = refreshedItem.vehicleJourneyId
+        ? mergeTrainDetails(refreshedItem, await trainDetails(refreshedItem.vehicleJourneyId))
+        : refreshedItem;
+
       setTrackedTrain({
         ...trackedTrain,
-        item: refreshedItem,
+        item: enrichedItem,
         updatedAt: refreshedAt,
       });
       setStatus(`Derniere mise à jour : ${formatTime(refreshedAt)}`);
@@ -625,11 +660,21 @@ export function AccessibleStationApp() {
           </nav>
         )}
 
-        <p className={error ? "status error" : "status"} role="status" aria-live="polite">
-          {error || status}
+        <p className="status" role="status" aria-live="polite">
+          {status}
         </p>
 
       </header>
+
+      {error && !trackedTrain && (
+        <div className="page-alert">
+          <ApiErrorAlert
+            title="Service indisponible"
+            message={error}
+            detail="Aucune nouvelle information n'a pu etre recuperee. Reessayez dans quelques instants."
+          />
+        </div>
+      )}
 
       {!selectedStation && (
         <section className="search-mode-panel" aria-label={searchModeLabel[searchMode]}>
@@ -865,14 +910,10 @@ function TrainTrackingView({
       </div>
 
       {error && (
-        <section className="tracking-error" role="alert" aria-label="Erreur de mise a jour">
-          <p className="tracking-alert-title">
-            <AlertTriangle aria-hidden="true" />
-            <span>Actualisation impossible</span>
-          </p>
-          <p>{error}</p>
-          <p>Les informations affichees ne sont pas confirmees par une nouvelle mise a jour.</p>
-        </section>
+        <ApiErrorAlert
+          message={error}
+          detail="Les informations affichees ne sont pas confirmees par une nouvelle mise a jour."
+        />
       )}
 
       <header className="tracking-header">
@@ -976,6 +1017,27 @@ function TrainTrackingView({
         </section>
       )}
     </article>
+  );
+}
+
+function ApiErrorAlert({
+  title = "Actualisation impossible",
+  message,
+  detail,
+}: {
+  title?: string;
+  message: string;
+  detail?: string;
+}) {
+  return (
+    <section className="api-error-alert" role="alert" aria-label={title}>
+      <p className="tracking-alert-title">
+        <AlertTriangle aria-hidden="true" />
+        <span>{title}</span>
+      </p>
+      <p>{message}</p>
+      {detail && <p>{detail}</p>}
+    </section>
   );
 }
 

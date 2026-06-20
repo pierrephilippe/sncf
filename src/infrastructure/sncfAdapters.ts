@@ -1,5 +1,5 @@
 import type { BoardItem, BoardType, Disruption, Station, TrainStatus } from "@/domain/types";
-import type { BoardResponse, NearbyResponse, PlacesResponse } from "./sncfSchemas";
+import type { BoardResponse, NearbyResponse, PlacesResponse, VehicleJourneyResponse } from "./sncfSchemas";
 
 const compact = (value: string | undefined): string | undefined => {
   const trimmed = value?.trim();
@@ -68,6 +68,7 @@ export class SncfBoardAdapter {
 
       return {
         id: `${type}-${display?.code ?? "train"}-${realtimeTime ?? baseTime ?? "time-unknown"}-${index}`,
+        vehicleJourneyId: findVehicleJourneyId(stopDate.links),
         time: toIsoDate(baseTime ?? realtimeTime),
         expectedTime: realtimeTime && realtimeTime !== baseTime ? toIsoDate(realtimeTime) : undefined,
         destination: type === "departures"
@@ -86,7 +87,29 @@ export class SncfBoardAdapter {
       };
     });
   }
+
+  fromVehicleJourney(response: VehicleJourneyResponse): Partial<BoardItem> {
+    const vehicleJourney = response.vehicle_journeys?.[0];
+    if (!vehicleJourney) return {};
+
+    const stopTimeStations = vehicleJourney.stop_times
+      ?.map((stopTime) => compact(stopTime.stop_point?.name ?? stopTime.stop_point?.label))
+      .filter((stationName): stationName is string => Boolean(stationName));
+    const servedStations = stopTimeStations && stopTimeStations.length > 0
+      ? stopTimeStations
+      : mapServedStations(vehicleJourney.route?.stop_points);
+
+    return {
+      servedStations,
+      routeLabel: routeLabelFromDisplay(vehicleJourney.route?.name),
+    };
+  }
 }
+
+const findVehicleJourneyId = (
+  links: Array<{ id?: string; rel?: string; type?: string }> | undefined,
+): string | undefined =>
+  links?.find((link) => (link.type === "vehicle_journey" || link.rel === "vehicle_journeys") && link.id)?.id;
 
 const toCoordinates = (lat?: string, lon?: string) => {
   if (!lat || !lon) return undefined;

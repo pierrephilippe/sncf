@@ -59,3 +59,6 @@ export const stationAnnouncements = (
   const params = pagingParams(options);
   return getJson(`/api/stations/${encodeURIComponent(stationId)}/announcements?${params.toString()}`);
 };
+
+export const trainDetails = (vehicleJourneyId: string): Promise<Partial<BoardItem>> =>
+  getJson(`/api/trains/${encodeURIComponent(vehicleJourneyId)}`);
