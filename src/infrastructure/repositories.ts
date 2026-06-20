@@ -1,5 +1,5 @@
 import type { BoardRepository, StationRepository } from "@/domain/ports";
-import type { BoardItem, BoardType, Coordinates, Station } from "@/domain/types";
+import type { BoardItem, BoardQuery, BoardType, Coordinates, Station } from "@/domain/types";
 import type { SncfHttpClient } from "./sncfClient";
 import { SncfBoardAdapter, SncfStationAdapter } from "./sncfAdapters";
 import {
@@ -51,11 +51,13 @@ export class SncfBoardRepository implements BoardRepository {
     private readonly adapter: SncfBoardAdapter,
   ) {}
 
-  async getBoard(stationId: string, type: BoardType): Promise<BoardItem[]> {
+  async getBoard(stationId: string, type: BoardType, query: BoardQuery = {}): Promise<BoardItem[]> {
     const response = await this.client.get<BoardResponse>(
       `/coverage/sncf/stop_areas/${encodeURIComponent(stationId)}/${type}`,
       {
-        count: 20,
+        count: query.count ?? 20,
+        start_page: query.page ?? 0,
+        ...(query.fromDateTime ? { from_datetime: toSncfDateTime(query.fromDateTime) } : {}),
         depth: 3,
         data_freshness: "realtime",
       },
@@ -65,3 +67,22 @@ export class SncfBoardRepository implements BoardRepository {
     return this.adapter.fromBoard(boardResponseSchema.parse(response.value), type);
   }
 }
+
+const toSncfDateTime = (isoDate: string): string => {
+  const date = new Date(isoDate);
+  const parts = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: "Europe/Paris",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "00";
+
+  return `${value("year")}${value("month")}${value("day")}T${value("hour")}${value("minute")}${value("second")}`;
+};

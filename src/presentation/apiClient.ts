@@ -1,5 +1,10 @@
 import type { Announcement, BoardItem, BoardType, Station } from "@/domain/types";
 
+type PagingOptions = {
+  fromDateTime?: string;
+  page?: number;
+};
+
 const DEFAULT_NETWORK_ERROR =
   "Connexion impossible. Verifiez votre reseau ou reessayez dans quelques instants.";
 
@@ -30,8 +35,27 @@ export const searchStations = (query: string): Promise<Station[]> =>
 export const nearbyStations = (latitude: number, longitude: number): Promise<Station[]> =>
   getJson(`/api/stations/nearby?lat=${latitude}&lon=${longitude}`);
 
-export const stationBoard = (stationId: string, type: BoardType): Promise<BoardItem[]> =>
-  getJson(`/api/stations/${encodeURIComponent(stationId)}/board?type=${type}`);
+const pagingParams = (options: PagingOptions = {}) => {
+  const params = new URLSearchParams();
+  if (options.fromDateTime) params.set("fromDateTime", options.fromDateTime);
+  if (options.page !== undefined) params.set("page", String(options.page));
+  return params;
+};
 
-export const stationAnnouncements = (stationId: string): Promise<Announcement[]> =>
-  getJson(`/api/stations/${encodeURIComponent(stationId)}/announcements`);
+export const stationBoard = (
+  stationId: string,
+  type: BoardType,
+  options: PagingOptions = {},
+): Promise<BoardItem[]> => {
+  const params = pagingParams(options);
+  params.set("type", type);
+  return getJson(`/api/stations/${encodeURIComponent(stationId)}/board?${params.toString()}`);
+};
+
+export const stationAnnouncements = (
+  stationId: string,
+  options: PagingOptions = {},
+): Promise<Announcement[]> => {
+  const params = pagingParams(options);
+  return getJson(`/api/stations/${encodeURIComponent(stationId)}/announcements?${params.toString()}`);
+};

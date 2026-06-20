@@ -1,6 +1,6 @@
 import type { BoardRepository, StationRepository } from "@/domain/ports";
 import { AnnouncementService } from "@/domain/announcements";
-import type { Announcement, BoardItem, BoardType, Coordinates, Station } from "@/domain/types";
+import type { Announcement, BoardItem, BoardQuery, BoardType, Coordinates, Station } from "@/domain/types";
 
 export class SearchStationsUseCase {
   constructor(private readonly stations: StationRepository) {}
@@ -21,8 +21,8 @@ export class FindNearbyStationsUseCase {
 export class GetStationBoardUseCase {
   constructor(private readonly boards: BoardRepository) {}
 
-  execute(stationId: string, type: BoardType): Promise<BoardItem[]> {
-    return this.boards.getBoard(stationId, type);
+  execute(stationId: string, type: BoardType, query?: BoardQuery): Promise<BoardItem[]> {
+    return this.boards.getBoard(stationId, type, query);
   }
 }
 
@@ -32,8 +32,8 @@ export class GetStationAnnouncementsUseCase {
     private readonly announcements: AnnouncementService,
   ) {}
 
-  async execute(stationId: string): Promise<Announcement[]> {
-    const departures = await this.boards.getBoard(stationId, "departures");
+  async execute(stationId: string, query?: BoardQuery): Promise<Announcement[]> {
+    const departures = await this.boards.getBoard(stationId, "departures", query);
     return this.announcements.fromBoard(departures);
   }
 }

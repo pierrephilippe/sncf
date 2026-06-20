@@ -63,6 +63,7 @@ export class SncfBoardAdapter {
         origin: type === "arrivals"
           ? compact(display?.direction) ?? compact(display?.headsign) ?? "Gare de depart non communiquee"
           : undefined,
+        servedStations: mapServedStations(entry.route?.stop_points),
         line: compact(display?.label) ?? compact(display?.name),
         trainNumber: compact(display?.code),
         platform: undefined,
@@ -120,6 +121,20 @@ const mapLinkedDisruptions = (
       message: disruption.messages?.map((message) => message.text).filter(Boolean).join(" "),
       severity: disruption.severity?.effect,
     }));
+};
+
+const mapServedStations = (
+  stopPoints: Array<{ name?: string; label?: string }> | undefined,
+): string[] | undefined => {
+  const stations = Array.from(
+    new Set(
+      stopPoints
+        ?.map((stopPoint) => compact(stopPoint.name) ?? compact(stopPoint.label))
+        .filter((name): name is string => Boolean(name)) ?? [],
+    ),
+  );
+
+  return stations.length > 0 ? stations : undefined;
 };
 
 const inferCity = (name: string): string | undefined => {

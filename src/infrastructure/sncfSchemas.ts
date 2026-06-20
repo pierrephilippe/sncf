@@ -11,6 +11,12 @@ const stopAreaSchema = z.object({
   coord: coordSchema.optional(),
 });
 
+const stopPointSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  label: z.string().optional(),
+});
+
 const placeSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
@@ -69,6 +75,11 @@ const stopDateTimeSchema = z.object({
 const boardEntrySchema = z.object({
   display_informations: displayInformationSchema.optional(),
   stop_date_time: stopDateTimeSchema,
+  route: z
+    .object({
+      stop_points: z.array(stopPointSchema).optional(),
+    })
+    .optional(),
 });
 
 export const boardResponseSchema = z.object({

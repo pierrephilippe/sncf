@@ -9,15 +9,30 @@ type RouteContext = {
 };
 
 export async function GET(request: Request, context: RouteContext): Promise<Response> {
-  const type = new URL(request.url).searchParams.get("type") ?? "departures";
+  const searchParams = new URL(request.url).searchParams;
+  const type = searchParams.get("type") ?? "departures";
   if (type !== "departures" && type !== "arrivals") {
     return badRequest("Le type doit etre departures ou arrivals.");
+  }
+
+  const page = Number(searchParams.get("page") ?? 0);
+  if (!Number.isInteger(page) || page < 0) {
+    return badRequest("La page doit etre un entier positif.");
+  }
+
+  const fromDateTime = searchParams.get("fromDateTime") ?? undefined;
+  if (fromDateTime && Number.isNaN(new Date(fromDateTime).getTime())) {
+    return badRequest("La date de debut est invalide.");
   }
 
   try {
     const { stationId } = await context.params;
     const app = createApplication();
-    const board = await app.getStationBoard.execute(decodeURIComponent(stationId), type as BoardType);
+    const board = await app.getStationBoard.execute(decodeURIComponent(stationId), type as BoardType, {
+      fromDateTime,
+      page,
+      count: 20,
+    });
     return jsonResponse(board, 200, 20);
   } catch (error) {
     return errorResponse(error);

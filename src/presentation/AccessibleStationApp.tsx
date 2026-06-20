@@ -2,6 +2,8 @@
 
 import {
   AlertTriangle,
+  ArrowLeft,
+  Bell,
   CheckCircle2,
   Clock3,
   Info,
@@ -14,7 +16,7 @@ import {
   Volume2,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Announcement, BoardItem, BoardType, Station } from "@/domain/types";
 import { nearbyStations, searchStations, stationAnnouncements, stationBoard } from "./apiClient";
 import { useFavorites } from "./useFavorites";
@@ -22,7 +24,30 @@ import { useFavorites } from "./useFavorites";
 type Tab = BoardType | "announcements";
 type SearchMode = "text" | "nearby" | "favorites";
 type BoardState = Record<BoardType, BoardItem[]>;
+type AnnouncementState = Announcement[];
 type LoadedState = Record<Tab, boolean>;
+type PagingState = Record<Tab, {
+  fromDateTime: string | null;
+  page: number;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+}>;
+type TrackedTrain = {
+  station: Station;
+  type: BoardType;
+  item: BoardItem;
+  updatedAt: string;
+};
+type NavigationState = {
+  selectedStation: Station | null;
+  activeTab: Tab;
+  searchMode: SearchMode;
+  query: string;
+  trackedTrain: TrackedTrain | null;
+};
+
+const PAGE_SIZE = 20;
+const NAVIGATION_STORAGE_KEY = "sncf-accessibilite:navigation";
 
 const searchModeLabel: Record<SearchMode, string> = {
   text: "Recherche par saisie",
@@ -62,6 +87,12 @@ const emptyLoadedState = (): LoadedState => ({
   announcements: false,
 });
 
+const emptyPagingState = (): PagingState => ({
+  departures: { fromDateTime: null, page: 0, hasMore: false, isLoadingMore: false },
+  arrivals: { fromDateTime: null, page: 0, hasMore: false, isLoadingMore: false },
+  announcements: { fromDateTime: null, page: 0, hasMore: false, isLoadingMore: false },
+});
+
 const readableError = (cause: unknown, fallback: string): string => {
   if (!(cause instanceof Error) || !cause.message.trim()) return fallback;
   if (cause.message === "Failed to fetch" || cause.message === "NetworkError when attempting to fetch resource.") {
@@ -84,18 +115,149 @@ const PriorityIcon = ({ priority }: { priority: Announcement["priority"] }) => {
   return <Megaphone aria-hidden="true" />;
 };
 
+const sameTrain = (trackedItem: BoardItem, candidate: BoardItem): boolean => {
+  if (candidate.id === trackedItem.id) return true;
+  if (!trackedItem.trainNumber || candidate.trainNumber !== trackedItem.trainNumber) return false;
+  return candidate.time === trackedItem.time || candidate.expectedTime === trackedItem.expectedTime;
+};
+
+const delayMinutes = (item: BoardItem): number | null => {
+  if (!item.expectedTime) return null;
+  const delay = Math.round((new Date(item.expectedTime).getTime() - new Date(item.time).getTime()) / 60000);
+  return delay > 0 ? delay : null;
+};
+
+const initialBoardDateTime = (): string => new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+const mergeById = <T extends { id: string }>(current: T[], next: T[]): T[] => {
+  const knownIds = new Set(current.map((item) => item.id));
+  return [...current, ...next.filter((item) => !knownIds.has(item.id))];
+};
+
+const sameStationName = (left: string | undefined, right: string | undefined): boolean =>
+  Boolean(left && right && left.trim().toLocaleLowerCase("fr-FR") === right.trim().toLocaleLowerCase("fr-FR"));
+
+const knownDifferentStation = (candidate: string | undefined, stationName: string): string | undefined => {
+  if (!candidate || sameStationName(candidate, stationName)) return undefined;
+  return candidate;
+};
+
+const isStation = (value: unknown): value is Station =>
+  typeof value === "object" &&
+  value !== null &&
+  "id" in value &&
+  "name" in value &&
+  "source" in value &&
+  typeof value.id === "string" &&
+  typeof value.name === "string" &&
+  value.source === "sncf";
+
+const isTab = (value: unknown): value is Tab =>
+  value === "departures" || value === "arrivals" || value === "announcements";
+
+const isBoardType = (value: unknown): value is BoardType =>
+  value === "departures" || value === "arrivals";
+
+const isSearchMode = (value: unknown): value is SearchMode =>
+  value === "text" || value === "nearby" || value === "favorites";
+
+const isBoardItem = (value: unknown): value is BoardItem =>
+  typeof value === "object" &&
+  value !== null &&
+  "id" in value &&
+  "time" in value &&
+  "destination" in value &&
+  "status" in value &&
+  "disruptions" in value &&
+  typeof value.id === "string" &&
+  typeof value.time === "string" &&
+  typeof value.destination === "string" &&
+  Array.isArray(value.disruptions);
+
+const isTrackedTrain = (value: unknown): value is TrackedTrain => {
+  if (typeof value !== "object" || value === null) return false;
+  const tracked = value as Partial<TrackedTrain>;
+  return isStation(tracked.station) &&
+    isBoardType(tracked.type) &&
+    isBoardItem(tracked.item) &&
+    typeof tracked.updatedAt === "string";
+};
+
+const readNavigationState = (): NavigationState | null => {
+  const raw = window.localStorage.getItem(NAVIGATION_STORAGE_KEY);
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<NavigationState>;
+    const selectedStation = parsed.selectedStation === null || parsed.selectedStation === undefined
+      ? null
+      : isStation(parsed.selectedStation) ? parsed.selectedStation : null;
+    const trackedTrain = parsed.trackedTrain === null || parsed.trackedTrain === undefined
+      ? null
+      : isTrackedTrain(parsed.trackedTrain) ? parsed.trackedTrain : null;
+
+    return {
+      selectedStation: trackedTrain?.station ?? selectedStation,
+      activeTab: trackedTrain?.type ?? (isTab(parsed.activeTab) ? parsed.activeTab : "departures"),
+      searchMode: isSearchMode(parsed.searchMode) ? parsed.searchMode : "text",
+      query: typeof parsed.query === "string" ? parsed.query : selectedStation?.name ?? "",
+      trackedTrain,
+    };
+  } catch {
+    window.localStorage.removeItem(NAVIGATION_STORAGE_KEY);
+    return null;
+  }
+};
+
+const writeNavigationState = (state: NavigationState) => {
+  window.localStorage.setItem(NAVIGATION_STORAGE_KEY, JSON.stringify(state));
+};
+
 export function AccessibleStationApp() {
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("departures");
   const [boards, setBoards] = useState<BoardState>(() => emptyBoardState());
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [announcements, setAnnouncements] = useState<AnnouncementState>([]);
   const [loadedTabs, setLoadedTabs] = useState<LoadedState>(() => emptyLoadedState());
+  const [paging, setPaging] = useState<PagingState>(() => emptyPagingState());
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("text");
+  const [trackedTrain, setTrackedTrain] = useState<TrackedTrain | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const navigationRestoredRef = useRef(false);
+  const skipNextNavigationSaveRef = useRef(true);
   const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
+
+  useEffect(() => {
+    const storedNavigation = readNavigationState();
+    navigationRestoredRef.current = true;
+    if (!storedNavigation) return;
+
+    setSelectedStation(storedNavigation.selectedStation);
+    setActiveTab(storedNavigation.activeTab);
+    setSearchMode(storedNavigation.searchMode);
+    setQuery(storedNavigation.query);
+    setTrackedTrain(storedNavigation.trackedTrain);
+  }, []);
+
+  useEffect(() => {
+    if (!navigationRestoredRef.current) return;
+    if (skipNextNavigationSaveRef.current) {
+      skipNextNavigationSaveRef.current = false;
+      return;
+    }
+
+    writeNavigationState({
+      selectedStation,
+      activeTab,
+      searchMode,
+      query,
+      trackedTrain,
+    });
+  }, [selectedStation, activeTab, searchMode, query, trackedTrain]);
 
   useEffect(() => {
     if (searchMode !== "text") {
@@ -135,19 +297,55 @@ export function AccessibleStationApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStation, activeTab, loadedTabs]);
 
+  useEffect(() => {
+    if (!selectedStation || trackedTrain) return;
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void loadMore();
+      }
+    }, { rootMargin: "240px" });
+
+    observer.observe(target);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStation, trackedTrain, activeTab, paging]);
+
   const refresh = async () => {
     if (!selectedStation) return;
     setStatus("Mise a jour des informations voyageurs.");
     setError("");
 
     try {
+      const fromDateTime = initialBoardDateTime();
       if (activeTab === "announcements") {
-        setAnnouncements(await stationAnnouncements(selectedStation.id));
+        const items = await stationAnnouncements(selectedStation.id, { fromDateTime, page: 0 });
+        setAnnouncements(items);
+        setPaging((currentPaging) => ({
+          ...currentPaging,
+          announcements: {
+            fromDateTime,
+            page: 0,
+            hasMore: items.length === PAGE_SIZE,
+            isLoadingMore: false,
+          },
+        }));
       } else {
-        const items = await stationBoard(selectedStation.id, activeTab);
+        const items = await stationBoard(selectedStation.id, activeTab, { fromDateTime, page: 0 });
         setBoards((currentBoards) => ({
           ...currentBoards,
           [activeTab]: items,
+        }));
+        setPaging((currentPaging) => ({
+          ...currentPaging,
+          [activeTab]: {
+            fromDateTime,
+            page: 0,
+            hasMore: items.length === PAGE_SIZE,
+            isLoadingMore: false,
+          },
         }));
       }
       setLoadedTabs((currentLoadedTabs) => ({
@@ -159,6 +357,65 @@ export function AccessibleStationApp() {
     } catch (cause) {
       setError(readableError(cause, "Informations indisponibles. Reessayez dans quelques instants."));
       setStatus("");
+    }
+  };
+
+  const loadMore = async () => {
+    if (!selectedStation || trackedTrain) return;
+
+    const currentPaging = paging[activeTab];
+    if (!currentPaging.hasMore || currentPaging.isLoadingMore) return;
+
+    const fromDateTime = currentPaging.fromDateTime ?? initialBoardDateTime();
+    const nextPage = currentPaging.page + 1;
+
+    setPaging((state) => ({
+      ...state,
+      [activeTab]: {
+        ...state[activeTab],
+        isLoadingMore: true,
+      },
+    }));
+    setError("");
+
+    try {
+      if (activeTab === "announcements") {
+        const items = await stationAnnouncements(selectedStation.id, { fromDateTime, page: nextPage });
+        setAnnouncements((current) => mergeById(current, items));
+        setPaging((state) => ({
+          ...state,
+          announcements: {
+            fromDateTime,
+            page: nextPage,
+            hasMore: items.length === PAGE_SIZE,
+            isLoadingMore: false,
+          },
+        }));
+      } else {
+        const items = await stationBoard(selectedStation.id, activeTab, { fromDateTime, page: nextPage });
+        setBoards((currentBoards) => ({
+          ...currentBoards,
+          [activeTab]: mergeById(currentBoards[activeTab], items),
+        }));
+        setPaging((state) => ({
+          ...state,
+          [activeTab]: {
+            fromDateTime,
+            page: nextPage,
+            hasMore: items.length === PAGE_SIZE,
+            isLoadingMore: false,
+          },
+        }));
+      }
+    } catch (cause) {
+      setError(readableError(cause, "Chargement des informations suivantes indisponible. Reessayez dans quelques instants."));
+      setPaging((state) => ({
+        ...state,
+        [activeTab]: {
+          ...state[activeTab],
+          isLoadingMore: false,
+        },
+      }));
     }
   };
 
@@ -200,6 +457,8 @@ export function AccessibleStationApp() {
     setBoards(emptyBoardState());
     setAnnouncements([]);
     setLoadedTabs(emptyLoadedState());
+    setPaging(emptyPagingState());
+    setTrackedTrain(null);
     setActiveTab("departures");
   };
 
@@ -210,7 +469,58 @@ export function AccessibleStationApp() {
     setBoards(emptyBoardState());
     setAnnouncements([]);
     setLoadedTabs(emptyLoadedState());
+    setPaging(emptyPagingState());
+    setTrackedTrain(null);
     setActiveTab("departures");
+  };
+
+  const followTrain = (item: BoardItem, type: BoardType) => {
+    if (!selectedStation) return;
+    setTrackedTrain({
+      station: selectedStation,
+      type,
+      item,
+      updatedAt: new Date().toISOString(),
+    });
+    setStatus(`Suivi du train ${item.trainNumber ?? "selectionne"} active.`);
+    setError("");
+  };
+
+  const refreshTrackedTrain = async () => {
+    if (!trackedTrain) return;
+
+    setStatus("Mise a jour du suivi du train.");
+    setError("");
+
+    try {
+      const items = await stationBoard(trackedTrain.station.id, trackedTrain.type);
+      setBoards((currentBoards) => ({
+        ...currentBoards,
+        [trackedTrain.type]: items,
+      }));
+      setLoadedTabs((currentLoadedTabs) => ({
+        ...currentLoadedTabs,
+        [trackedTrain.type]: true,
+      }));
+
+      const refreshedItem = items.find((item) => sameTrain(trackedTrain.item, item));
+      const refreshedAt = new Date().toISOString();
+      if (!refreshedItem) {
+        setTrackedTrain({ ...trackedTrain, updatedAt: refreshedAt });
+        setStatus("Train non retrouve dans les prochaines informations. Il peut etre parti, arrive ou ne plus etre affiche.");
+        return;
+      }
+
+      setTrackedTrain({
+        ...trackedTrain,
+        item: refreshedItem,
+        updatedAt: refreshedAt,
+      });
+      setStatus(`Derniere mise à jour : ${formatTime(refreshedAt)}`);
+    } catch (cause) {
+      setError(readableError(cause, "Suivi du train indisponible. Reessayez dans quelques instants."));
+      setStatus("");
+    }
   };
 
   return (
@@ -269,7 +579,7 @@ export function AccessibleStationApp() {
           )}
         </div>
 
-        {selectedStation && (
+        {selectedStation && !trackedTrain && (
           <nav className="header-action-bar" aria-label="Actions de gare">
             <button className="button-secondary compact-button refresh-button" type="button" onClick={refresh}>
               <span className="button-content">
@@ -397,10 +707,33 @@ export function AccessibleStationApp() {
       {selectedStation && (
         <section className="station-content" aria-label={`Informations de ${selectedStation.name}`}>
 
-          {activeTab === "announcements" ? (
+          {trackedTrain ? (
+            <TrainTrackingView
+              trackedTrain={trackedTrain}
+              onBack={() => setTrackedTrain(null)}
+              onRefresh={refreshTrackedTrain}
+            />
+          ) : activeTab === "announcements" ? (
             <AnnouncementList announcements={announcements} />
           ) : (
-            <BoardList items={visibleBoard} type={activeTab} />
+            <BoardList items={visibleBoard} type={activeTab} onFollow={followTrain} />
+          )}
+
+          {!trackedTrain && loadedTabs[activeTab] && (
+            <div className="load-more" ref={loadMoreRef}>
+              {paging[activeTab].hasMore ? (
+                <button
+                  className="button-secondary"
+                  type="button"
+                  disabled={paging[activeTab].isLoadingMore}
+                  onClick={loadMore}
+                >
+                  {paging[activeTab].isLoadingMore ? "Chargement en cours" : "Charger plus"}
+                </button>
+              ) : (
+                <p className="muted">Tous les resultats disponibles sont affiches.</p>
+              )}
+            </div>
           )}
         </section>
       )}
@@ -408,7 +741,15 @@ export function AccessibleStationApp() {
   );
 }
 
-function BoardList({ items, type }: { items: BoardItem[]; type: BoardType }) {
+function BoardList({
+  items,
+  type,
+  onFollow,
+}: {
+  items: BoardItem[];
+  type: BoardType;
+  onFollow: (item: BoardItem, type: BoardType) => void;
+}) {
   if (items.length === 0) return <p className="muted">Aucune information a afficher pour le moment.</p>;
 
   return (
@@ -446,9 +787,169 @@ function BoardList({ items, type }: { items: BoardItem[]; type: BoardType }) {
               {disruption.title}
             </p>
           ))}
+          <button
+            className="button-secondary train-follow-button"
+            type="button"
+            onClick={() => onFollow(item, type)}
+          >
+            <span className="button-content">
+              <Bell aria-hidden="true" />
+              <span>{item.trainNumber ? `Suivre le train ${item.trainNumber}` : "Suivre ce train"}</span>
+            </span>
+          </button>
         </li>
       ))}
     </ul>
+  );
+}
+
+function TrainTrackingView({
+  trackedTrain,
+  onBack,
+  onRefresh,
+}: {
+  trackedTrain: TrackedTrain;
+  onBack: () => void;
+  onRefresh: () => void;
+}) {
+  const { item, type, station, updatedAt } = trackedTrain;
+  const firstServedStation = item.servedStations?.[0];
+  const lastServedStation = item.servedStations?.at(-1);
+  const departurePlace = type === "arrivals"
+    ? knownDifferentStation(firstServedStation, station.name) ?? knownDifferentStation(item.origin, station.name)
+    : station.name;
+  const arrivalPlace = type === "arrivals"
+    ? station.name
+    : knownDifferentStation(lastServedStation, station.name) ?? knownDifferentStation(item.destination, station.name);
+  const trainName = [item.line, item.trainNumber ? `Train ${item.trainNumber}` : undefined]
+    .filter(Boolean)
+    .join(" - ") || "Train suivi";
+  const delay = delayMinutes(item);
+  const hasRealtimeTime = Boolean(item.expectedTime && item.expectedTime !== item.time);
+  const hasImportantInformation =
+    item.status === "delayed" ||
+    item.status === "cancelled" ||
+    item.status === "disrupted" ||
+    item.disruptions.length > 0;
+
+  return (
+    <article className="train-tracking" aria-labelledby="train-tracking-title">
+      <div className="tracking-actions">
+        <button className="button-secondary compact-button" type="button" onClick={onBack}>
+          <span className="button-content">
+            <ArrowLeft aria-hidden="true" />
+            <span>Retour</span>
+          </span>
+        </button>
+        <button className="button-secondary compact-button" type="button" onClick={onRefresh}>
+          <span className="button-content">
+            <RefreshCw aria-hidden="true" />
+            <span>Actualiser</span>
+          </span>
+        </button>
+      </div>
+
+      <header className="tracking-header">
+        <div className="tracking-train-identity" aria-label="Train">
+          <h2>{trainName}</h2>
+        </div>
+        <div className="tracking-route-cards" aria-labelledby="train-tracking-title">
+          <div className="tracking-route-card">
+            <span>Depart</span>
+            <strong id="train-tracking-title">{departurePlace ?? "Non communique"}</strong>
+          </div>
+          <div className="tracking-route-card">
+            <span>Arrivee</span>
+            <strong>{arrivalPlace ?? "Non communique"}</strong>
+          </div>
+        </div>
+      </header>
+
+      <div className="tracking-summary-cards">
+        <div className="tracking-summary-card" aria-label={type === "arrivals" ? "Heure d'arrivee" : "Heure de depart"}>
+          <span>
+            {type === "arrivals"
+              ? hasRealtimeTime ? "Arrivee retardee" : "Arrivee"
+              : hasRealtimeTime ? "Depart retarde" : "Depart"}
+          </span>
+          {hasRealtimeTime && (
+            <time className="original-time" dateTime={item.time}>{formatTime(item.time)}</time>
+          )}
+          <time dateTime={item.expectedTime ?? item.time}>{formatTime(item.expectedTime ?? item.time)}</time>
+        </div>
+        <div className="tracking-summary-card" aria-label="Voie du train">
+          <span>Voie</span>
+          <strong>{item.platform ?? "NC"}</strong>
+        </div>
+        <div className="tracking-summary-card" aria-label="Statut du train">
+          <span>Status</span>
+          <strong className="status-summary">
+            <StatusIcon status={item.status} />
+            <span>{statusLabel[item.status]}</span>
+          </strong>
+        </div>
+      </div>
+
+      {hasImportantInformation && (
+        <section className="tracking-alert" aria-label="Informations importantes du train">
+          <p className="tracking-alert-title">
+            <StatusIcon status={item.status} />
+            <span>{statusLabel[item.status]}</span>
+          </p>
+          {delay !== null && <p>Retard estime : {delay} minutes.</p>}
+          {item.status === "cancelled" && <p>Ce train est indique comme supprime.</p>}
+          {item.status === "disrupted" && item.disruptions.length === 0 && (
+            <p>Une perturbation est indiquee pour ce train.</p>
+          )}
+          {item.disruptions.map((disruption, index) => (
+            <p key={`${disruption.id}-alert-${index}`}>
+              <strong>{disruption.title}</strong>
+              {disruption.message ? ` - ${disruption.message}` : ""}
+            </p>
+          ))}
+        </section>
+      )}
+
+      <p className="tracking-updated-at">
+        Derniere actualisation : <time dateTime={updatedAt}>{formatTime(updatedAt)}</time>
+      </p>
+
+      {type === "departures" && item.servedStations && item.servedStations.length > 0 && (
+        <section className="tracking-section" aria-label="Gares desservies">
+          <h3>Gares desservies</h3>
+          <ol className="served-stations">
+            {item.servedStations.map((stationName, index) => (
+              <li key={`${stationName}-${index}`}>{stationName}</li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {item.coachPositions && item.coachPositions.length > 0 && (
+        <section className="tracking-section" aria-label="Plan voitures et reperes">
+          <h3>Plan voitures et reperes</h3>
+          <ul className="coach-position-list">
+            {item.coachPositions.map((coach) => (
+              <li key={`${coach.coachNumber}-${coach.marker}`}>
+                Voiture {coach.coachNumber} - Repere {coach.marker}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {item.disruptions.length > 0 && (
+        <section className="tracking-disruptions" aria-label="Perturbations du train">
+          <h3>Perturbations</h3>
+          {item.disruptions.map((disruption, index) => (
+            <p key={`${disruption.id}-${index}`}>
+              <strong>{disruption.title}</strong>
+              {disruption.message ? ` - ${disruption.message}` : ""}
+            </p>
+          ))}
+        </section>
+      )}
+    </article>
   );
 }
 

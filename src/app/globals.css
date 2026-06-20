@@ -457,9 +457,24 @@ input {
   gap: 0.65rem;
 }
 
+.load-more {
+  display: grid;
+  margin-top: 1rem;
+  padding-block: 0.75rem 1.5rem;
+}
+
+.load-more .button-secondary {
+  width: 100%;
+}
+
 .board-item,
 .announcement {
   padding: 0.9rem 0;
+}
+
+.train-follow-button {
+  margin-top: 0.75rem;
+  width: 100%;
 }
 
 .announcement {
@@ -516,6 +531,147 @@ input {
   border-style: double;
   border-width: 3px;
   background: var(--surface-strong);
+}
+
+.train-tracking {
+  display: grid;
+  gap: 1rem;
+}
+
+.tracking-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.tracking-header {
+  padding-block: 0.5rem;
+}
+
+.tracking-route-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.tracking-route-card {
+  min-width: 0;
+  padding: 0.35rem 0;
+}
+
+.tracking-route-card span {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.tracking-route-card strong {
+  display: block;
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+
+.tracking-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.tracking-summary-card {
+  min-width: 0;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  text-align: center;
+}
+
+.tracking-summary-card span {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.tracking-summary-card time,
+.tracking-summary-card strong {
+  display: block;
+  color: var(--brand);
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.tracking-summary-card .original-time {
+  color: var(--muted);
+  font-size: 0.95rem;
+  text-decoration: line-through;
+  text-decoration-thickness: 0.14em;
+}
+
+.status-summary {
+  display: inline-flex;
+  justify-content: center;
+  gap: 0.3rem;
+  align-items: center;
+  font-size: 1rem;
+}
+
+.tracking-alert {
+  display: grid;
+  gap: 0.35rem;
+  border: 3px double var(--warning);
+  border-radius: 6px;
+  padding: 0.7rem;
+  background: var(--surface-strong);
+}
+
+.tracking-alert p {
+  margin: 0;
+}
+
+.tracking-alert-title {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  font-weight: 900;
+}
+
+.tracking-train-identity {
+  padding-bottom: 0.35rem;
+}
+
+.tracking-train-identity h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.tracking-updated-at {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.tracking-disruptions {
+  border-left: 8px double var(--warning);
+  padding-left: 0.9rem;
+}
+
+.tracking-section {
+  padding-top: 0.25rem;
+}
+
+.tracking-section h3,
+.tracking-disruptions h3 {
+  margin-top: 0;
+}
+
+.served-stations,
+.coach-position-list {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0;
+  padding-left: 1.35rem;
 }
 
 html[data-theme="classic"] .tag.warning {

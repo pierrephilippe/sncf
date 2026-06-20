@@ -14,6 +14,12 @@ export type Station = {
 
 export type BoardType = "departures" | "arrivals";
 
+export type BoardQuery = {
+  fromDateTime?: string;
+  page?: number;
+  count?: number;
+};
+
 export type TrainStatus =
   | "on_time"
   | "delayed"
@@ -34,6 +40,11 @@ export type BoardItem = {
   expectedTime?: string;
   destination: string;
   origin?: string;
+  servedStations?: string[];
+  coachPositions?: Array<{
+    coachNumber: string;
+    marker: string;
+  }>;
   line?: string;
   trainNumber?: string;
   platform?: string;

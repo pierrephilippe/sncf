@@ -46,4 +46,56 @@ describe("SncfBoardAdapter", () => {
 
     expect(firstItem.id).not.toBe(secondItem.id);
   });
+
+  it("extrait les gares desservies si elles sont presentes dans la reponse SNCF", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        departures: [
+          {
+            display_informations: { code: "876543", direction: "Paris Gare de Lyon" },
+            stop_date_time: {
+              base_departure_date_time: "20260620T140800",
+              departure_date_time: "20260620T140800",
+            },
+            route: {
+              stop_points: [
+                { name: "Lyon Part Dieu" },
+                { name: "Dijon Ville" },
+                { name: "Paris Gare de Lyon" },
+              ],
+            },
+          },
+        ],
+      },
+      "departures",
+    );
+
+    expect(item.servedStations).toEqual(["Lyon Part Dieu", "Dijon Ville", "Paris Gare de Lyon"]);
+  });
+
+  it("conserve les gares desservies pour une arrivee si elles sont presentes", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        arrivals: [
+          {
+            display_informations: { code: "123456", direction: "Lyon Part Dieu" },
+            stop_date_time: {
+              base_arrival_date_time: "20260620T160500",
+              arrival_date_time: "20260620T160500",
+            },
+            route: {
+              stop_points: [
+                { name: "Marseille Saint-Charles" },
+                { name: "Avignon TGV" },
+                { name: "Lyon Part Dieu" },
+              ],
+            },
+          },
+        ],
+      },
+      "arrivals",
+    );
+
+    expect(item.servedStations).toEqual(["Marseille Saint-Charles", "Avignon TGV", "Lyon Part Dieu"]);
+  });
 });
