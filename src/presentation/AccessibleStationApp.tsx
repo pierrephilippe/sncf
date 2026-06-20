@@ -8,6 +8,7 @@ import {
   Megaphone,
   RefreshCw,
   Search,
+  Star,
   Trash2,
   X,
   Volume2,
@@ -94,7 +95,7 @@ export function AccessibleStationApp() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [searchMode, setSearchMode] = useState<SearchMode>("text");
-  const { favorites, removeFavorite } = useFavorites();
+  const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
 
   useEffect(() => {
     if (searchMode !== "text") {
@@ -220,6 +221,19 @@ export function AccessibleStationApp() {
           {selectedStation ? (
             <div className="current-station-row">
               <h1 className="current-station-name">{selectedStation.name}</h1>
+              {!isFavorite(selectedStation.id) && (
+                <button
+                  className="icon-button compact-button"
+                  type="button"
+                  aria-label={`Ajouter ${selectedStation.name} aux favoris`}
+                  onClick={() => addFavorite(selectedStation)}
+                >
+                  <span className="button-content">
+                    <Star aria-hidden="true" />
+                    <span>Favori</span>
+                  </span>
+                </button>
+              )}
               <button
                 className="icon-button compact-button"
                 type="button"

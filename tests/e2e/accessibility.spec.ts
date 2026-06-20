@@ -87,8 +87,46 @@ test("les suggestions disparaissent apres selection d'une gare", async ({ page }
   await page.getByLabel("Nom de gare").fill("Lyon");
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
 
-  await expect(page.getByRole("button", { name: /lyon part dieu/i })).not.toBeVisible();
+  await expect(page.getByRole("list", { name: "Suggestions de gares" })).not.toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "Lyon Part Dieu" })).toBeVisible();
+});
+
+test("une gare selectionnee peut etre ajoutee aux favoris depuis l'en-tete", async ({ page }) => {
+  await page.route("**/api/stations/search**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "stop_area:SNCF:87723197",
+          name: "Lyon Part Dieu",
+          city: "Lyon",
+          source: "sncf",
+        },
+      ]),
+    });
+  });
+
+  await page.route("**/api/stations/*/board**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Nom de gare").fill("Lyon");
+  await page.getByRole("button", { name: /lyon part dieu/i }).click();
+
+  const addFavoriteButton = page.getByRole("button", { name: "Ajouter Lyon Part Dieu aux favoris" });
+  await expect(addFavoriteButton).toBeVisible();
+  await addFavoriteButton.click();
+  await expect(addFavoriteButton).not.toBeVisible();
+
+  await page.getByRole("button", { name: "Supprimer la gare selectionnee" }).click();
+  await page.getByRole("tab", { name: "Favoris" }).click();
+  await expect(page.getByRole("button", { name: "Lyon Part Dieu", exact: true })).toBeVisible();
 });
 
 test("les boutons de recherche basculent entre saisie, autour et favoris", async ({ page }) => {
