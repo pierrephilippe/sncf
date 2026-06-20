@@ -26,7 +26,6 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
     "@eslint/js": "^9.39.4",
-    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.54.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -37,7 +36,16 @@
     "eslint": "^9.30.0",
     "eslint-config-next": "^15.4.0",
     "jsdom": "^26.1.0",
+    "postcss": "^8.5.15",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.15"
+    },
+    "vite": {
+      "esbuild": "0.28.1"
+    }
   }
 }

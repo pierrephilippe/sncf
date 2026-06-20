@@ -12,15 +12,15 @@ Les principaux risques identifies concernent surtout l'exposition publique des r
 
 | ID | Priorite | Sujet | Statut | Derniere mise a jour |
 | --- | --- | --- | --- | --- |
-| SEC-001 | Critique | Vulnerabilites `npm audit`, notamment `tmp` via `@lhci/cli` | A traiter | 2026-06-20 |
-| SEC-002 | Critique | Absence de limitation de debit sur les routes `/api/stations/*` | A traiter | 2026-06-20 |
-| SEC-003 | Important | Cache public sur `/api/stations/nearby` avec coordonnees utilisateur dans l'URL | A traiter | 2026-06-20 |
-| SEC-004 | Important | Validation insuffisante des entrees API `q`, `lat`, `lon` | A traiter | 2026-06-20 |
-| SEC-005 | Important | Absence de Content Security Policy | A traiter | 2026-06-20 |
-| SEC-006 | Important | `SNCF_API_BASE_URL` configurable sans allowlist stricte en production | A traiter | 2026-06-20 |
-| ARCH-001 | Moyen | Strategie d'erreur mixte `Result` puis exceptions dans les repositories | A evaluer | 2026-06-20 |
-| ARCH-002 | Moyen | `BoardItem` pourrait devenir un type discrimine depart/arrivee | A evaluer | 2026-06-20 |
-| DATA-001 | Faible | Favoris `localStorage` lus sans validation structuree | A traiter | 2026-06-20 |
+| SEC-001 | Critique | Vulnerabilites `npm audit`, notamment `tmp` via `@lhci/cli` | Traite | 2026-06-20 |
+| SEC-002 | Critique | Absence de limitation de debit sur les routes `/api/stations/*` | Traite | 2026-06-20 |
+| SEC-003 | Important | Cache public sur `/api/stations/nearby` avec coordonnees utilisateur dans l'URL | Traite | 2026-06-20 |
+| SEC-004 | Important | Validation insuffisante des entrees API `q`, `lat`, `lon` | Traite | 2026-06-20 |
+| SEC-005 | Important | Absence de Content Security Policy | Traite | 2026-06-20 |
+| SEC-006 | Important | `SNCF_API_BASE_URL` configurable sans allowlist stricte en production | Traite | 2026-06-20 |
+| ARCH-001 | Moyen | Strategie d'erreur mixte `Result` puis exceptions dans les repositories | Reporte | 2026-06-20 |
+| ARCH-002 | Moyen | `BoardItem` pourrait devenir un type discrimine depart/arrivee | Reporte | 2026-06-20 |
+| DATA-001 | Faible | Favoris `localStorage` lus sans validation structuree | Traite | 2026-06-20 |
 | DATA-002 | Moyen | Enrichissement origine/destination via `vehicle_journey` uniquement sur la page de suivi | Traite | 2026-06-20 |
 | DATA-003 | Important | Arrivees SNCF : `display_informations.direction` peut designer la gare d'arrivee, pas l'origine | Traite | 2026-06-20 |
 | ACC-001 | Important | Rendu homogene et explicite des erreurs API avec `role=alert` | Traite | 2026-06-20 |
@@ -55,6 +55,13 @@ Recommandation :
 - Si la chaine reste vulnerable, remplacer Lighthouse CI par un controle Playwright + axe + seuil Lighthouse execute via une dependance moins risquee.
 - Garder `package-lock.json` versionne et verifier regulierement `npm audit`.
 
+Correction appliquee :
+
+- `@lhci/cli` a ete retire pour supprimer la chaine vulnerable `tmp`, `js-yaml` et `uuid`.
+- Le controle accessibilite CI existant a ete conserve via Playwright + axe dans `scripts/run-lighthouse-ci.mjs`, sans dependance Lighthouse CI.
+- `postcss` est installe en version corrigee et des overrides npm ciblent `next -> postcss` et `vite -> esbuild`.
+- Verification finale : `npm audit --audit-level=moderate` retourne `found 0 vulnerabilities`.
+
 ### SEC-002 - Routes API sans limitation de debit
 
 Priorite : Critique
@@ -79,6 +86,12 @@ Recommandation :
 - Garder un cache court sur les donnees publiques de tableau.
 - Inclure la route `/api/trains/*`, car elle proxifie aussi l'API SNCF avec le token serveur.
 
+Correction appliquee :
+
+- Ajout d'un rate limiter applicatif en memoire par IP et par route.
+- Les routes `/api/stations/search`, `/api/stations/nearby`, `/api/stations/[stationId]/board`, `/api/stations/[stationId]/announcements` et `/api/trains/[vehicleJourneyId]` l'utilisent.
+- En cas de depassement, l'API retourne `429` avec `Retry-After: 60`.
+
 ### SEC-003 - Cache public sur la recherche autour de soi
 
 Priorite : Important
@@ -97,6 +110,10 @@ Recommandation :
 - Utiliser `Cache-Control: private, no-store` pour `/api/stations/nearby`.
 - Ou arrondir fortement les coordonnees avant appel et cache si un cache est indispensable.
 - Eviter tout log applicatif contenant les coordonnees completes.
+
+Correction appliquee :
+
+- `/api/stations/nearby` retourne maintenant `Cache-Control: private, no-store, max-age=0`.
 
 ### SEC-004 - Validation des entrees API insuffisante
 
@@ -120,6 +137,12 @@ Recommandation :
 - Valider latitude entre `-90` et `90`.
 - Valider longitude entre `-180` et `180`.
 - Ajouter des tests unitaires de validation API.
+
+Correction appliquee :
+
+- La recherche est bornee entre 2 et 80 caracteres apres trim.
+- Les coordonnees sont validees avec Zod : nombres finis, latitude entre `-90` et `90`, longitude entre `-180` et `180`.
+- Des tests unitaires couvrent les recherches trop courtes/trop longues et les coordonnees invalides.
 
 ### SEC-005 - Absence de Content Security Policy
 
@@ -145,6 +168,11 @@ Remarque :
 
 La directive `style-src 'unsafe-inline'` peut etre necessaire avec Next.js selon le rendu CSS. A verifier en build et E2E.
 
+Correction appliquee :
+
+- Ajout d'une CSP dans `netlify.toml` avec `default-src 'self'`, `connect-src 'self'`, `frame-ancestors 'none'`, `base-uri 'self'` et `form-action 'self'`.
+- Build et E2E verifies apres ajout.
+
 ### SEC-006 - Base URL SNCF sans allowlist stricte
 
 Priorite : Important
@@ -164,6 +192,12 @@ Recommandation :
 - En local/test, conserver une possibilite d'injection controlee si necessaire.
 - Ajouter un test sur la configuration.
 
+Correction appliquee :
+
+- En production, `SNCF_API_BASE_URL` est refusee si elle ne vaut pas `https://api.sncf.com/v1`.
+- Les environnements local/test conservent l'injection d'une base URL alternative.
+- Tests unitaires ajoutes pour les deux comportements.
+
 ### ARCH-001 - Strategie d'erreur mixte
 
 Priorite : Moyen
@@ -181,6 +215,11 @@ Recommandation :
 - Choisir une strategie dominante.
 - Option pragmatique : conserver `Result` dans l'infrastructure et convertir en `Response` au plus pres des routes, sans exceptions attendues.
 - Option simple : assumer les exceptions applicatives, mais retirer `Result` du client.
+
+Decision :
+
+- Reporte volontairement : ce point est architectural et n'etait pas necessaire pour reduire les risques de securite identifies.
+- La strategie actuelle reste stable et couverte par les tests existants.
 
 ### ARCH-002 - Modele `BoardItem` depart/arrivee
 
@@ -201,6 +240,11 @@ Recommandation :
   - `ArrivalBoardItem`
 - Garder l'API interne compatible si possible.
 
+Decision :
+
+- Reporte volontairement : le modele actuel fonctionne et les corrections deja traitees evitent l'affichage d'une origine ou destination inventee.
+- Le changement vers un type discrimine peut etre fait plus tard avec une migration ciblee de l'UI et des repositories.
+
 ### DATA-001 - Favoris `localStorage` sans validation
 
 Priorite : Faible
@@ -218,6 +262,12 @@ Recommandation :
 - Valider les favoris lus avec Zod.
 - Supprimer la valeur stockee si le schema est invalide.
 - Limiter explicitement le nombre et la taille des champs stockes.
+
+Correction appliquee :
+
+- Les favoris lus depuis `localStorage` sont valides avec Zod.
+- Les valeurs invalides sont supprimees.
+- La liste est limitee a 8 favoris et les tailles des champs stockes sont bornees.
 
 ### DATA-003 - Origine des trains a l'arrivee
 

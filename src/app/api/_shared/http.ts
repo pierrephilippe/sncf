@@ -11,6 +11,14 @@ export const jsonResponse = <T>(body: T, status = 200, cacheSeconds = 30): Respo
     },
   });
 
+export const privateNoStoreJsonResponse = <T>(body: T, status = 200): Response =>
+  Response.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "private, no-store, max-age=0",
+    },
+  });
+
 export const errorResponse = (error: unknown): Response => {
   if (isAppError(error)) {
     return Response.json({ error: error.message, code: error.code }, { status: error.status });
@@ -28,6 +36,18 @@ export const errorResponse = (error: unknown): Response => {
 
 export const badRequest = (message: string): Response =>
   Response.json({ error: message, code: "bad_request" }, { status: 400 });
+
+export const tooManyRequests = (): Response =>
+  Response.json(
+    { error: "Trop de requêtes. Réessayez dans quelques instants.", code: "rate_limited" },
+    {
+      status: 429,
+      headers: {
+        "Cache-Control": "no-store, max-age=0",
+        "Retry-After": "60",
+      },
+    },
+  );
 
 const isAppError = (error: unknown): error is AppError =>
   typeof error === "object" &&

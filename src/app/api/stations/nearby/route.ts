@@ -1,21 +1,26 @@
 import { createApplication } from "@/infrastructure/container";
-import { badRequest, errorResponse, jsonResponse } from "../../_shared/http";
+import { badRequest, errorResponse, privateNoStoreJsonResponse } from "../../_shared/http";
+import { checkRateLimit } from "../../_shared/rateLimit";
+import { nearbyStationQuerySchema, validationMessage } from "../../_shared/validation";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request): Promise<Response> {
-  const params = new URL(request.url).searchParams;
-  const latitude = Number(params.get("lat"));
-  const longitude = Number(params.get("lon"));
+  const rateLimitResponse = checkRateLimit(request);
+  if (rateLimitResponse) return rateLimitResponse;
 
-  if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
-    return badRequest("Les coordonnees lat et lon sont obligatoires.");
-  }
+  const params = new URL(request.url).searchParams;
+  const parsedCoordinates = nearbyStationQuerySchema.safeParse({
+    latitude: params.get("lat"),
+    longitude: params.get("lon"),
+  });
+  if (!parsedCoordinates.success) return badRequest(validationMessage(parsedCoordinates.error));
 
   try {
     const app = createApplication();
+    const { latitude, longitude } = parsedCoordinates.data;
     const stations = await app.findNearbyStations.execute({ latitude, longitude });
-    return jsonResponse(stations);
+    return privateNoStoreJsonResponse(stations);
   } catch (error) {
     return errorResponse(error);
   }
