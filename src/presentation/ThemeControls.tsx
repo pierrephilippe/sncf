@@ -46,7 +46,7 @@ export function ThemeControls() {
       >
         <span className="button-content">
           {isClassic ? <Moon aria-hidden="true" /> : <Eye aria-hidden="true" />}
-          <span>{isClassic ? "Mode accessible" : "Affichage classique"}</span>
+          <span>{isClassic ? "MODE SOMBRE" : "MODE CLAIR"}</span>
         </span>
       </button>
 

@@ -2,6 +2,7 @@
 
 import {
   AlertTriangle,
+  ChevronDown,
   CheckCircle2,
   Clock3,
   Info,
@@ -11,6 +12,7 @@ import {
   Search,
   Star,
   Trash2,
+  X,
   Volume2,
   XCircle,
 } from "lucide-react";
@@ -43,6 +45,14 @@ const priorityLabel: Record<Announcement["priority"], string> = {
   info: "Information",
 };
 
+const readableError = (cause: unknown, fallback: string): string => {
+  if (!(cause instanceof Error) || !cause.message.trim()) return fallback;
+  if (cause.message === "Failed to fetch" || cause.message === "NetworkError when attempting to fetch resource.") {
+    return "Connexion impossible. Verifiez votre reseau ou reessayez dans quelques instants.";
+  }
+  return cause.message;
+};
+
 const StatusIcon = ({ status }: { status: BoardItem["status"] }) => {
   if (status === "cancelled") return <XCircle aria-hidden="true" />;
   if (status === "delayed") return <Clock3 aria-hidden="true" />;
@@ -67,9 +77,16 @@ export function AccessibleStationApp() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [favoritesOpen, setFavoritesOpen] = useState(false);
+  const [isMenuExpanded, setIsMenuExpanded] = useState(false);
   const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
 
   useEffect(() => {
+    if (selectedStation && query.trim() === selectedStation.name) {
+      setSuggestions([]);
+      return;
+    }
+
     if (query.trim().length < 2) {
       setSuggestions([]);
       return;
@@ -82,13 +99,13 @@ export function AccessibleStationApp() {
         setSuggestions(await searchStations(query));
         setStatus("Suggestions mises a jour.");
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Recherche indisponible.");
+        setError(readableError(cause, "Recherche indisponible. Reessayez dans quelques instants."));
         setStatus("");
       }
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [query]);
+  }, [query, selectedStation]);
 
   useEffect(() => {
     if (!selectedStation) return;
@@ -110,7 +127,7 @@ export function AccessibleStationApp() {
       setUpdatedAt(new Date().toISOString());
       setStatus("Informations mises a jour.");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Informations indisponibles.");
+      setError(readableError(cause, "Informations indisponibles. Reessayez dans quelques instants."));
       setStatus("");
     }
   };
@@ -130,7 +147,7 @@ export function AccessibleStationApp() {
           setSuggestions(stations);
           setStatus(stations.length ? "Gares proches trouvees." : "Aucune gare proche trouvee.");
         } catch (cause) {
-          setError(cause instanceof Error ? cause.message : "Recherche autour de vous indisponible.");
+          setError(readableError(cause, "Recherche autour de vous indisponible. Reessayez dans quelques instants."));
           setStatus("");
         }
       },
@@ -143,62 +160,172 @@ export function AccessibleStationApp() {
   };
 
   const visibleBoard = useMemo(() => board, [board]);
+  const selectStation = (station: Station) => {
+    setSelectedStation(station);
+    setQuery(station.name);
+    setSuggestions([]);
+    setFavoritesOpen(false);
+    setIsMenuExpanded(false);
+  };
 
   return (
     <div className="page">
-      <header className="hero">
-        <div className="hero-topline">
-          <p className="kicker">SNCF accessible</p>
-          <ThemeControls />
-        </div>
-        <h1>Les informations de gare, lisibles et disponibles sur mobile</h1>
-        <p className="lead">
-          Recherchez une gare, consultez les departs, arrivees, retards et annonces textuelles
-          reconstruites depuis les donnees SNCF.
-        </p>
-      </header>
+      <header className="app-header">
+        {!selectedStation && <h1 className="sr-only">SNCF</h1>}
+        <div className="app-header-main">
+          {selectedStation ? (
+            <h1 className="current-station-name">{selectedStation.name}</h1>
+          ) : (
+            <div className="search-row" role="search">
+              <label className="sr-only" htmlFor="station-search">
+                Nom de gare
+              </label>
+              <Search className="input-icon" aria-hidden="true" />
+              <input
+                id="station-search"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setFavoritesOpen(false);
+                }}
+                placeholder="Rechercher une gare"
+                autoComplete="off"
+              />
+            </div>
+          )}
 
-      <section className="panel" aria-labelledby="recherche-title">
-        <h2 id="recherche-title">Choisir une gare</h2>
-        <div className="toolbar">
-          <button className="button" type="button" onClick={findNearby}>
+          <button
+            className="button-secondary compact-button menu-toggle"
+            type="button"
+            aria-expanded={isMenuExpanded}
+            aria-controls="expanded-menu"
+            onClick={() => setIsMenuExpanded((expanded) => !expanded)}
+          >
             <span className="button-content">
-              <MapPin aria-hidden="true" />
-              <span>Autour de moi</span>
+              <ChevronDown aria-hidden="true" />
+              <span>Menu</span>
             </span>
           </button>
         </div>
-        <div className="field">
-          <label htmlFor="station-search">Nom de gare</label>
-          <div className="search-row">
-            <Search className="input-icon" aria-hidden="true" />
-            <input
-              id="station-search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Exemple: Lyon Part Dieu"
-              autoComplete="off"
-            />
+
+        <nav className={`header-action-bar ${selectedStation ? "" : "is-empty"}`} aria-label="Actions de gare">
+          {selectedStation && (
+            <>
+              <button className="button-secondary compact-button refresh-button" type="button" onClick={refresh}>
+                <span className="button-content">
+                  <RefreshCw aria-hidden="true" />
+                  <span>Actualiser</span>
+                </span>
+              </button>
+
+              <div className="tabs" role="tablist" aria-label="Informations disponibles">
+                <button
+                  className="tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "departures"}
+                  onClick={() => setActiveTab("departures")}
+                >
+                  Departs
+                </button>
+                <button
+                  className="tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "arrivals"}
+                  onClick={() => setActiveTab("arrivals")}
+                >
+                  Arrivees
+                </button>
+                <button
+                  className="tab"
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === "announcements"}
+                  onClick={() => setActiveTab("announcements")}
+                >
+                  Annonces
+                </button>
+              </div>
+            </>
+          )}
+        </nav>
+
+        {isMenuExpanded && (
+          <div id="expanded-menu" className="expanded-menu">
+            <h2 className="sr-only">Menu</h2>
+            <ThemeControls />
+            <div className="quick-actions">
+              <button className="button-secondary compact-button" type="button" onClick={findNearby}>
+                <span className="button-content">
+                  <MapPin aria-hidden="true" />
+                  <span>Autour</span>
+                </span>
+              </button>
+              <button
+                className="button-secondary compact-button"
+                type="button"
+                aria-expanded={favoritesOpen}
+                aria-controls="favorites-panel"
+                onClick={() => {
+                  setFavoritesOpen((open) => !open);
+                  setSuggestions([]);
+                }}
+              >
+                <span className="button-content">
+                  <Star aria-hidden="true" />
+                  <span>Favoris</span>
+                </span>
+              </button>
+            </div>
+            {selectedStation && (
+              <div className="quick-actions">
+                <button
+                  className="button-secondary compact-button"
+                  type="button"
+                  onClick={() =>
+                    isFavorite(selectedStation.id)
+                      ? removeFavorite(selectedStation.id)
+                      : addFavorite(selectedStation)
+                  }
+                >
+                  <span className="button-content">
+                    <Star aria-hidden="true" />
+                    <span>{isFavorite(selectedStation.id) ? "Retirer favori" : "Ajouter favori"}</span>
+                  </span>
+                </button>
+                <button
+                  className="button-secondary compact-button"
+                  type="button"
+                  aria-label="Effacer la gare selectionnee"
+                  onClick={() => {
+                    setSelectedStation(null);
+                    setQuery("");
+                    setBoard([]);
+                    setAnnouncements([]);
+                    setUpdatedAt(null);
+                    setIsMenuExpanded(false);
+                  }}
+                >
+                  <span className="button-content">
+                    <X aria-hidden="true" />
+                    <span>Effacer</span>
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
-        </div>
+        )}
 
         <p className={error ? "status error" : "status"} role="status" aria-live="polite">
           {error || status}
         </p>
 
         {suggestions.length > 0 && (
-          <ul className="suggestions" aria-label="Suggestions de gares">
+          <ul className="suggestions header-menu" aria-label="Suggestions de gares">
             {suggestions.map((station) => (
               <li key={station.id}>
-                <button
-                  className="suggestion-button"
-                  type="button"
-                  onClick={() => {
-                    setSelectedStation(station);
-                    setQuery(station.name);
-                    setSuggestions([]);
-                  }}
-                >
+                <button className="suggestion-button" type="button" onClick={() => selectStation(station)}>
                   <strong>{station.name}</strong>
                   {station.distanceMeters ? (
                     <span className="muted"> - {Math.round(station.distanceMeters)} metres</span>
@@ -208,93 +335,46 @@ export function AccessibleStationApp() {
             ))}
           </ul>
         )}
-      </section>
 
-      {favorites.length > 0 && (
-        <section className="panel" aria-labelledby="favoris-title">
-          <h2 id="favoris-title">Favoris</h2>
-          <ul className="favorite-list">
-            {favorites.map((station) => (
-              <li className="favorite-row" key={station.id}>
-                <button className="suggestion-button" type="button" onClick={() => setSelectedStation(station)}>
-                  {station.name}
-                </button>
-                <button
-                  className="icon-button"
-                  type="button"
-                  aria-label={`Retirer ${station.name} des favoris`}
-                  onClick={() => removeFavorite(station.id)}
-                >
-                  <span className="button-content">
-                    <Trash2 aria-hidden="true" />
-                    <span>Retirer</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {favoritesOpen && (
+          <div id="favorites-panel" className="header-menu" aria-label="Gares favorites">
+            {favorites.length === 0 ? (
+              <p className="muted">Aucune gare favorite.</p>
+            ) : (
+              <ul className="favorite-list">
+                {favorites.map((station) => (
+                  <li className="favorite-row" key={station.id}>
+                    <button className="suggestion-button" type="button" onClick={() => selectStation(station)}>
+                      {station.name}
+                    </button>
+                    <button
+                      className="icon-button compact-button"
+                      type="button"
+                      aria-label={`Retirer ${station.name} des favoris`}
+                      onClick={() => removeFavorite(station.id)}
+                    >
+                      <span className="button-content">
+                        <Trash2 aria-hidden="true" />
+                        <span>Retirer</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </header>
+
+      {!selectedStation && <div className="empty-results-panel" aria-hidden="true" />}
 
       {selectedStation && (
-        <section className="panel" aria-labelledby="station-title">
+        <section className="station-content" aria-labelledby="station-title">
           <div className="station-header">
             <div>
               <h2 id="station-title">{selectedStation.name}</h2>
               {updatedAt && <p className="muted">Derniere mise a jour: {formatTime(updatedAt)}</p>}
             </div>
-            <div className="toolbar">
-              <button className="button-secondary" type="button" onClick={refresh}>
-                <span className="button-content">
-                  <RefreshCw aria-hidden="true" />
-                  <span>Actualiser</span>
-                </span>
-              </button>
-              <button
-                className="button-secondary"
-                type="button"
-                onClick={() =>
-                  isFavorite(selectedStation.id)
-                    ? removeFavorite(selectedStation.id)
-                    : addFavorite(selectedStation)
-                }
-              >
-                <span className="button-content">
-                  <Star aria-hidden="true" />
-                  <span>{isFavorite(selectedStation.id) ? "Retirer favori" : "Ajouter favori"}</span>
-                </span>
-              </button>
-            </div>
-          </div>
-
-          <div className="tabs" role="tablist" aria-label="Informations disponibles">
-            <button
-              className="tab"
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "departures"}
-              onClick={() => setActiveTab("departures")}
-            >
-              Departs
-            </button>
-            <button
-              className="tab"
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "arrivals"}
-              onClick={() => setActiveTab("arrivals")}
-            >
-              Arrivees
-            </button>
-            <button
-              className="tab"
-              type="button"
-              role="tab"
-              aria-selected={activeTab === "announcements"}
-              onClick={() => setActiveTab("announcements")}
-            >
-              Annonces
-            </button>
           </div>
 
           {activeTab === "announcements" ? (
