@@ -1,6 +1,14 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.title === "application installable comme PWA") return;
+
+  await page.addInitScript(() => {
+    (window as Window & { __SNCF_DISABLE_PWA_SW?: boolean }).__SNCF_DISABLE_PWA_SW = true;
+  });
+});
+
 test("accueil mobile accessible sans violation axe critique", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByLabel("Nom de gare")).toBeVisible();
@@ -8,6 +16,29 @@ test("accueil mobile accessible sans violation axe critique", async ({ page }) =
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
+});
+
+test("application installable comme PWA", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", "/manifest.webmanifest");
+
+  const manifestResponse = await page.request.get("/manifest.webmanifest");
+  expect(manifestResponse.ok()).toBe(true);
+  const manifest = await manifestResponse.json() as {
+    display?: string;
+    icons?: Array<{ src?: string; purpose?: string }>;
+  };
+
+  expect(manifest.display).toBe("standalone");
+  expect(manifest.icons?.some((icon) => icon.src === "/icons/icon-512.png")).toBe(true);
+  expect(manifest.icons?.some((icon) => icon.purpose === "maskable")).toBe(true);
+
+  const registrationScope = await page.waitForFunction(async () => {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    return registration?.scope ?? null;
+  });
+  expect(await registrationScope.jsonValue()).toContain("/");
 });
 
 test("la recherche expose un message d'erreur accessible si l'API est indisponible", async ({ page }) => {

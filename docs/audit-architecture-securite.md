@@ -23,6 +23,7 @@ Les principaux risques identifies concernent surtout l'exposition publique des r
 | DATA-001 | Faible | Favoris `localStorage` lus sans validation structuree | A traiter | 2026-06-20 |
 | DATA-002 | Moyen | Enrichissement origine/destination via `vehicle_journey` uniquement sur la page de suivi | Traite | 2026-06-20 |
 | ACC-001 | Important | Rendu homogene et explicite des erreurs API avec `role=alert` | Traite | 2026-06-20 |
+| PWA-001 | Important | Installation PWA avec service worker sans cache des donnees SNCF temps reel | Traite | 2026-06-20 |
 
 ## Constats detailles
 
@@ -266,6 +267,36 @@ Decision :
 Raison :
 
 Les erreurs ne doivent pas etre portees par une simple couleur ou une ligne de statut peu visible. Le rendu commun rend les pannes API plus lisibles, plus coherentes et mieux annoncees par les technologies d'assistance.
+
+### PWA-001 - Installation PWA
+
+Priorite : Important
+
+Statut : Traite le 2026-06-20
+
+Fichiers concernes :
+
+- `public/manifest.webmanifest`
+- `public/sw.js`
+- `public/icon.svg`
+- `public/icons/*`
+- `src/app/layout.tsx`
+- `src/presentation/PwaRegistration.tsx`
+- `netlify.toml`
+- `tests/unit/pwa-assets.test.ts`
+- `tests/e2e/accessibility.spec.ts`
+
+Decision :
+
+- L'application dispose d'un manifest installable, d'icones PNG/SVG, d'une icone maskable et d'une icone Apple Touch.
+- Le service worker met en cache l'interface et les assets statiques utiles au demarrage.
+- Les routes `/api/*` ne sont jamais mises en cache par le service worker : elles restent servies par le reseau pour eviter des horaires, retards ou alertes obsoletes.
+- Les headers Netlify forcent une revalidation courte de `/sw.js` et le bon type MIME du manifest.
+- Les tests E2E des parcours fonctionnels desactivent explicitement l'enregistrement du service worker pour que les mocks API restent fiables. Un test E2E dedie verifie l'installation PWA.
+
+Raison :
+
+La PWA doit pouvoir s'installer et ouvrir l'interface rapidement, mais l'application ne doit pas laisser croire que des informations SNCF temps reel sont a jour lorsqu'elles proviennent d'un cache local.
 
 ## Points positifs
 

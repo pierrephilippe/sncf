@@ -1,4 +1,4 @@
-# Accessibilite SNCF
+# SNCFady
 
 Web app mobile-first pour consulter les informations voyageurs SNCF dans une interface accessible: departs, arrivees, perturbations et alertes textuelles reconstruites.
 

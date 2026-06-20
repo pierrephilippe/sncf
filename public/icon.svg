@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Train a vapeur SNCFady</title>
+  <rect width="512" height="512" rx="96" fill="#050505"/>
+  <g fill="none" stroke="#f7f7f7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M141 341h247" stroke-width="26"/>
+    <path d="M150 291h174c35 0 64 22 76 50H124c0-28 11-50 26-50Z" fill="#f7f7f7" stroke-width="14"/>
+    <path d="M183 196h110v95H183z" fill="#f7f7f7" stroke-width="14"/>
+    <path d="M318 229h43v62h-43z" fill="#f7f7f7" stroke-width="14"/>
+    <path d="M339 198h30v31h-30z" fill="#f7f7f7" stroke-width="14"/>
+    <path d="M208 224h58v43h-58z" fill="#050505" stroke-width="10"/>
+    <path d="M154 261h29" stroke="#050505" stroke-width="12"/>
+    <circle cx="187" cy="355" r="31" fill="#050505" stroke-width="18"/>
+    <circle cx="282" cy="355" r="31" fill="#050505" stroke-width="18"/>
+    <circle cx="362" cy="355" r="22" fill="#050505" stroke-width="16"/>
+    <path d="M215 355h39M313 355h27" stroke-width="14"/>
+    <path d="M193 173c-17-16-17-38 0-54" stroke-width="24"/>
+    <path d="M253 154c-24-22-24-54 0-78" stroke-width="24"/>
+    <path d="M315 173c-17-16-17-38 0-54" stroke-width="24"/>
+    <path d="M122 399h268" stroke-width="18"/>
+  </g>
+</svg>

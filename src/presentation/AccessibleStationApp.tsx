@@ -566,7 +566,7 @@ export function AccessibleStationApp() {
   return (
     <div className="page">
       <header className="app-header">
-        {!selectedStation && <h1 className="sr-only">SNCF</h1>}
+        {!selectedStation && <h1 className="sr-only">SNCFady</h1>}
         <div className="app-header-main">
           {selectedStation ? (
             <div className="current-station-row">
