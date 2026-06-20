@@ -5,7 +5,9 @@ export const jsonResponse = <T>(body: T, status = 200, cacheSeconds = 30): Respo
   Response.json(body, {
     status,
     headers: {
-      "Cache-Control": `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}, stale-while-revalidate=60`,
+      "Cache-Control": cacheSeconds > 0
+        ? `public, max-age=${cacheSeconds}, s-maxage=${cacheSeconds}, stale-while-revalidate=60`
+        : "no-store, max-age=0",
     },
   });
 

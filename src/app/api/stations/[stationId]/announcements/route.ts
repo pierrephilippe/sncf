@@ -27,7 +27,7 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
       page,
       count: 20,
     });
-    return jsonResponse(announcements, 200, 20);
+    return jsonResponse(announcements, 200, 0);
   } catch (error) {
     return errorResponse(error);
   }

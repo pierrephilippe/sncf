@@ -11,15 +11,15 @@ describe("AnnouncementService", () => {
     const items: BoardItem[] = [
       {
         id: "delayed",
-        time: "2026-06-20T12:00:00+01:00",
-        expectedTime: "2026-06-20T12:10:00+01:00",
+        time: "2026-06-20T12:00:00+02:00",
+        expectedTime: "2026-06-20T12:10:00+02:00",
         destination: "Dijon",
         status: "delayed",
         disruptions: [],
       },
       {
         id: "cancelled",
-        time: "2026-06-20T12:05:00+01:00",
+        time: "2026-06-20T12:05:00+02:00",
         destination: "Paris Gare de Lyon",
         status: "cancelled",
         disruptions: [],

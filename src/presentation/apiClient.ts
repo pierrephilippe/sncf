@@ -12,7 +12,7 @@ const getJson = async <T>(url: string): Promise<T> => {
   let response: Response;
 
   try {
-    response = await fetch(url);
+    response = await fetch(url, { cache: "no-store" });
   } catch {
     throw new Error(DEFAULT_NETWORK_ERROR);
   }
