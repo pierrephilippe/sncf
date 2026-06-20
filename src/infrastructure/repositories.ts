@@ -50,12 +50,19 @@ export class SncfStationRepository implements StationRepository {
 }
 
 export class SncfBoardRepository implements BoardRepository {
+  private static readonly REALTIME_LOOKBACK_MINUTES = 180;
+  private static readonly MAX_FILTERED_PAGES = 8;
+
   constructor(
     private readonly client: SncfHttpClient,
     private readonly adapter: SncfBoardAdapter,
   ) {}
 
   async getBoard(stationId: string, type: BoardType, query: BoardQuery = {}): Promise<BoardItem[]> {
+    if (query.fromDateTime) {
+      return this.getFilteredRealtimeBoard(stationId, type, query);
+    }
+
     const response = await this.client.get<BoardResponse>(
       `/coverage/sncf/stop_areas/${encodeURIComponent(stationId)}/${type}`,
       {
@@ -75,6 +82,74 @@ export class SncfBoardRepository implements BoardRepository {
     if (type === "arrivals") return this.withResolvedArrivalOrigins(board, parsedResponse);
 
     return board;
+  }
+
+  private async getFilteredRealtimeBoard(stationId: string, type: BoardType, query: BoardQuery): Promise<BoardItem[]> {
+    const requestedCount = query.count ?? 20;
+    const requestedPage = query.page ?? 0;
+    const requestedOffset = requestedPage * requestedCount;
+    const threshold = query.fromDateTime ?? new Date().toISOString();
+    const externalFromDateTime = subtractMinutes(threshold, SncfBoardRepository.REALTIME_LOOKBACK_MINUTES);
+    const responses: BoardResponse[] = [];
+
+    for (let page = 0; page < SncfBoardRepository.MAX_FILTERED_PAGES; page += 1) {
+      const response = await this.client.get<BoardResponse>(
+        `/coverage/sncf/stop_areas/${encodeURIComponent(stationId)}/${type}`,
+        {
+          count: requestedCount,
+          start_page: page,
+          from_datetime: toSncfDateTime(externalFromDateTime),
+          depth: 3,
+          data_freshness: "realtime",
+        },
+      );
+      if (!response.ok) throw response.error;
+
+      const parsedResponse = boardResponseSchema.parse(response.value);
+      responses.push(parsedResponse);
+
+      const mergedResponse = mergeBoardResponses(responses);
+      const mappedBoard = this.adapter.fromBoard(mergedResponse, type);
+      const relevantItems = filterBoardFromDateTime(mappedBoard, threshold);
+      const entries = type === "departures" ? parsedResponse.departures ?? [] : parsedResponse.arrivals ?? [];
+
+      if (relevantItems.length >= requestedOffset + requestedCount || entries.length < requestedCount) {
+        return this.resolveFilteredPage(mappedBoard, mergedResponse, type, threshold, requestedOffset, requestedCount);
+      }
+    }
+
+    const mergedResponse = mergeBoardResponses(responses);
+    return this.resolveFilteredPage(
+      this.adapter.fromBoard(mergedResponse, type),
+      mergedResponse,
+      type,
+      threshold,
+      requestedOffset,
+      requestedCount,
+    );
+  }
+
+  private async resolveFilteredPage(
+    board: BoardItem[],
+    response: BoardResponse,
+    type: BoardType,
+    threshold: string,
+    offset: number,
+    count: number,
+  ): Promise<BoardItem[]> {
+    const relevantPairs = board
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => isBoardItemVisibleFrom(item, threshold))
+      .slice(offset, offset + count);
+    const pageBoard = relevantPairs.map(({ item }) => item);
+    const pageResponse = sliceBoardResponse(response, type, relevantPairs.map(({ index }) => index));
+
+    return this.resolveDirectionNames(pageBoard, pageResponse, type);
+  }
+
+  private async resolveDirectionNames(board: BoardItem[], response: BoardResponse, type: BoardType): Promise<BoardItem[]> {
+    if (type === "departures") return this.withResolvedDepartureDestinations(board, response);
+    return this.withResolvedArrivalOrigins(board, response);
   }
 
   private async withResolvedDepartureDestinations(board: BoardItem[], response: BoardResponse): Promise<BoardItem[]> {
@@ -169,6 +244,46 @@ const toSncfDateTime = (isoDate: string): string => {
     parts.find((part) => part.type === type)?.value ?? "00";
 
   return `${value("year")}${value("month")}${value("day")}T${value("hour")}${value("minute")}${value("second")}`;
+};
+
+const subtractMinutes = (isoDate: string, minutes: number): string =>
+  new Date(new Date(isoDate).getTime() - minutes * 60 * 1000).toISOString();
+
+const effectiveBoardTime = (item: BoardItem): string => item.expectedTime ?? item.time;
+
+const filterBoardFromDateTime = (items: BoardItem[], fromDateTime: string): BoardItem[] => {
+  const threshold = new Date(fromDateTime).getTime();
+  if (Number.isNaN(threshold)) return items;
+
+  return items.filter((item) => isBoardItemVisibleFrom(item, fromDateTime));
+};
+
+const isBoardItemVisibleFrom = (item: BoardItem, fromDateTime: string): boolean => {
+  const threshold = new Date(fromDateTime).getTime();
+  if (Number.isNaN(threshold)) return true;
+  return new Date(effectiveBoardTime(item)).getTime() >= threshold;
+};
+
+const mergeBoardResponses = (responses: BoardResponse[]): BoardResponse => ({
+  departures: responses.flatMap((response) => response.departures ?? []),
+  arrivals: responses.flatMap((response) => response.arrivals ?? []),
+  disruptions: responses.flatMap((response) => response.disruptions ?? []),
+});
+
+const sliceBoardResponse = (response: BoardResponse, type: BoardType, indexes: number[]): BoardResponse => {
+  if (type === "departures") {
+    const departures = response.departures ?? [];
+    return {
+      departures: indexes.map((index) => departures[index]).filter((item): item is NonNullable<typeof item> => Boolean(item)),
+      disruptions: response.disruptions,
+    };
+  }
+
+  const arrivals = response.arrivals ?? [];
+  return {
+    arrivals: indexes.map((index) => arrivals[index]).filter((item): item is NonNullable<typeof item> => Boolean(item)),
+    disruptions: response.disruptions,
+  };
 };
 
 const findLinkedStopAreaId = (

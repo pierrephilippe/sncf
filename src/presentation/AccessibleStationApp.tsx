@@ -241,24 +241,38 @@ const writeNavigationState = (state: NavigationState) => {
 };
 
 export function AccessibleStationApp() {
-  const [initialNavigation] = useState<NavigationState | null>(() => readNavigationState());
-  const [query, setQuery] = useState(initialNavigation?.query ?? "");
+  const [hasRestoredNavigation, setHasRestoredNavigation] = useState(false);
+  const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<Station[]>([]);
-  const [selectedStation, setSelectedStation] = useState<Station | null>(initialNavigation?.selectedStation ?? null);
-  const [activeTab, setActiveTab] = useState<Tab>(initialNavigation?.activeTab ?? "departures");
+  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>("departures");
   const [boards, setBoards] = useState<BoardState>(() => emptyBoardState());
   const [announcements, setAnnouncements] = useState<AnnouncementState>([]);
   const [loadedTabs, setLoadedTabs] = useState<LoadedState>(() => emptyLoadedState());
   const [paging, setPaging] = useState<PagingState>(() => emptyPagingState());
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [searchMode, setSearchMode] = useState<SearchMode>(initialNavigation?.searchMode ?? "text");
-  const [trackedTrain, setTrackedTrain] = useState<TrackedTrain | null>(initialNavigation?.trackedTrain ?? null);
+  const [searchMode, setSearchMode] = useState<SearchMode>("text");
+  const [trackedTrain, setTrackedTrain] = useState<TrackedTrain | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const attemptedTrainDetailsRef = useRef<Set<string>>(new Set());
   const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
 
   useEffect(() => {
+    if (hasRestoredNavigation) return;
+    const restoredNavigation = readNavigationState();
+    if (restoredNavigation) {
+      setQuery(restoredNavigation.query);
+      setSelectedStation(restoredNavigation.selectedStation);
+      setActiveTab(restoredNavigation.activeTab);
+      setSearchMode(restoredNavigation.searchMode);
+      setTrackedTrain(restoredNavigation.trackedTrain);
+    }
+    setHasRestoredNavigation(true);
+  }, [hasRestoredNavigation]);
+
+  useEffect(() => {
+    if (!hasRestoredNavigation) return;
     writeNavigationState({
       selectedStation,
       activeTab,
@@ -266,7 +280,7 @@ export function AccessibleStationApp() {
       query,
       trackedTrain,
     });
-  }, [selectedStation, activeTab, searchMode, query, trackedTrain]);
+  }, [hasRestoredNavigation, selectedStation, activeTab, searchMode, query, trackedTrain]);
 
   useEffect(() => {
     if (searchMode !== "text") {
@@ -835,18 +849,32 @@ function BoardList({
                 </p>
                 <p className="muted">{item.line ?? "Ligne non communiquée"}</p>
               </div>
-              <time className="time" dateTime={item.expectedTime ?? item.time}>
-                {formatTime(item.expectedTime ?? item.time)}
+              <time className="time" dateTime={item.time}>
+                {formatTime(item.time)}
               </time>
             </div>
             <div className="meta">
               <span className="tag">Voie {item.platform ?? "non communiquée"}</span>
-              <span className={`tag ${item.status === "cancelled" ? "danger" : item.status === "delayed" || item.status === "disrupted" ? "warning" : ""}`}>
-                <span className="tag-content">
-                  <StatusIcon status={item.status} />
-                  <span>{statusLabel[item.status]}</span>
+              {delayMinutes(item) !== null && (
+                <span className="tag warning">
+                  <span className="tag-content">
+                    <Clock3 aria-hidden="true" />
+                    <span>
+                      {type === "arrivals" ? "Arrivée retardée" : "Départ retardé"}
+                      {delayMinutes(item) !== null ? ` de ${delayMinutes(item)} min` : ""}
+                      {item.expectedTime ? ` - nouvel horaire ${formatTime(item.expectedTime)}` : ""}
+                    </span>
+                  </span>
                 </span>
-              </span>
+              )}
+              {item.status !== "delayed" && (
+                <span className={`tag ${item.status === "cancelled" ? "danger" : item.status === "disrupted" ? "warning" : ""}`}>
+                  <span className="tag-content">
+                    <StatusIcon status={item.status} />
+                    <span>{statusLabel[item.status]}</span>
+                  </span>
+                </span>
+              )}
             </div>
             {item.disruptions.map((disruption, index) => (
               <p className="muted board-disruption" key={`${disruption.id}-${index}`}>

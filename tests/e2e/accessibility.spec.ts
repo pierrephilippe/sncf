@@ -362,6 +362,62 @@ test("les départs se chargent depuis maintenant moins cinq minutes avec paginat
   expect(requestedFromDateTimes[1]).toBe(requestedFromDateTimes[0]);
 });
 
+test("un train retardé affiche l'heure prévue et le nouvel horaire dans les listes", async ({ page }) => {
+  await page.route("**/api/stations/search**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "stop_area:SNCF:87141002",
+          name: "Nancy",
+          city: "Nancy",
+          source: "sncf",
+        },
+      ]),
+    });
+  });
+
+  await page.route("**/api/stations/*/board**", async (route) => {
+    const type = new URL(route.request().url()).searchParams.get("type");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: `${type}-delayed`,
+          time: "2026-06-20T13:40:00+02:00",
+          expectedTime: "2026-06-20T14:40:00+02:00",
+          destination: type === "departures" ? "Paris Est" : undefined,
+          origin: type === "arrivals" ? "Metz" : undefined,
+          line: "TER",
+          trainNumber: "123456",
+          platform: "2",
+          status: "delayed",
+          disruptions: [],
+        },
+      ]),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Nom de gare").fill("Nancy");
+  await page.getByRole("button", { name: "Nancy", exact: true }).click();
+
+  const departureCard = page.locator(".board-item").first();
+  await expect(departureCard.locator(".time")).toHaveText("13:40");
+  await expect(departureCard).toContainText("Départ retardé");
+  await expect(departureCard).toContainText("nouvel horaire 14:40");
+  await expect(departureCard.locator(".tag", { hasText: /^Retard$/ })).toHaveCount(0);
+
+  await page.getByRole("tab", { name: "Arrivées" }).click();
+  const arrivalCard = page.locator(".board-item").first();
+  await expect(arrivalCard.locator(".time")).toHaveText("13:40");
+  await expect(arrivalCard).toContainText("Arrivée retardée");
+  await expect(arrivalCard).toContainText("nouvel horaire 14:40");
+  await expect(arrivalCard.locator(".tag", { hasText: /^Retard$/ })).toHaveCount(0);
+});
+
 test("un train peut être suivi puis actualisé sur une page dédiée", async ({ page }) => {
   let boardCalls = 0;
 
