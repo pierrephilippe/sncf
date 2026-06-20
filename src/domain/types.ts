@@ -33,6 +33,7 @@ export type BoardItem = {
   time: string;
   expectedTime?: string;
   destination: string;
+  origin?: string;
   line?: string;
   trainNumber?: string;
   platform?: string;

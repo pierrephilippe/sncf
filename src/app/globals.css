@@ -129,9 +129,9 @@ html[data-theme="classic"] .app-shell {
 
 .app-header-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.5rem;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: stretch;
 }
 
 .current-station-name {
@@ -144,12 +144,12 @@ html[data-theme="classic"] .app-shell {
   font-weight: 900;
 }
 
-.menu-toggle svg {
-  transition: transform 150ms ease;
-}
-
-.menu-toggle[aria-expanded="true"] svg {
-  transform: rotate(180deg);
+.current-station-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
 }
 
 .header-action-bar {
@@ -163,45 +163,12 @@ html[data-theme="classic"] .app-shell {
   border-top: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
 }
 
-.header-action-bar.is-empty {
-  grid-template-columns: 1fr;
-}
-
-.expanded-menu {
-  display: grid;
-  gap: 0.65rem;
-  margin-top: 0.65rem;
-  padding-top: 0.65rem;
-  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-}
-
-.theme-controls {
-  display: flex;
-  flex: 1 1 auto;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  min-width: 0;
-}
-
-.brightness-control {
-  display: grid;
-  gap: 0.15rem;
-  min-width: min(42vw, 10rem);
-}
-
-.brightness-label,
 .button-content,
 .tag-content,
 .announcement-priority {
   display: inline-flex;
   gap: 0.45rem;
   align-items: center;
-}
-
-.brightness-control input[type="range"] {
-  width: 100%;
-  min-height: 2.25rem;
-  accent-color: var(--brand);
 }
 
 .kicker {
@@ -290,11 +257,26 @@ h2 {
   gap: 0.5rem;
 }
 
+.search-mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  min-width: 0;
+  border: 2px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 .search-row {
   display: grid;
   grid-template-columns: 1fr;
   gap: 0.75rem;
   position: relative;
+}
+
+.search-block {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
 }
 
 .input-icon {
@@ -317,6 +299,12 @@ input {
 
 .search-row input {
   padding-left: 2.6rem;
+}
+
+.search-mode-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
 }
 
 .button,
@@ -373,6 +361,10 @@ input {
   gap: 0.5rem;
 }
 
+.suggestions-section {
+  padding: 0.75rem 0;
+}
+
 .header-menu {
   max-height: min(45svh, 22rem);
   overflow: auto;
@@ -408,11 +400,6 @@ input {
   font-weight: 700;
   text-decoration: underline;
   text-decoration-thickness: 0.12em;
-}
-
-.station-header {
-  display: grid;
-  gap: 0.75rem;
 }
 
 .refresh-button {
@@ -588,15 +575,6 @@ html[data-theme="classic"] .tag.danger {
     font-size: 2.7rem;
   }
 
-  .station-header {
-    grid-template-columns: 1fr auto;
-    align-items: end;
-  }
-
-  .theme-controls {
-    width: auto;
-    flex: 0 1 auto;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

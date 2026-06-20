@@ -23,3 +23,19 @@ export const delayedDepartureFixture: BoardResponse = {
     },
   ],
 };
+
+export const arrivalFixture: BoardResponse = {
+  arrivals: [
+    {
+      display_informations: {
+        code: "123456",
+        direction: "Marseille Saint-Charles",
+        label: "TGV INOUI",
+      },
+      stop_date_time: {
+        base_arrival_date_time: "20260620T160500",
+        arrival_date_time: "20260620T160500",
+      },
+    },
+  ],
+};

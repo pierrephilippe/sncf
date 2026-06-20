@@ -2,15 +2,12 @@
 
 import {
   AlertTriangle,
-  ChevronDown,
   CheckCircle2,
   Clock3,
   Info,
-  MapPin,
   Megaphone,
   RefreshCw,
   Search,
-  Star,
   Trash2,
   X,
   Volume2,
@@ -19,10 +16,18 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import type { Announcement, BoardItem, BoardType, Station } from "@/domain/types";
 import { nearbyStations, searchStations, stationAnnouncements, stationBoard } from "./apiClient";
-import { ThemeControls } from "./ThemeControls";
 import { useFavorites } from "./useFavorites";
 
 type Tab = BoardType | "announcements";
+type SearchMode = "text" | "nearby" | "favorites";
+type BoardState = Record<BoardType, BoardItem[]>;
+type LoadedState = Record<Tab, boolean>;
+
+const searchModeLabel: Record<SearchMode, string> = {
+  text: "Recherche par saisie",
+  nearby: "Recherche autour",
+  favorites: "Selection de favoris",
+};
 
 const formatTime = (isoDate: string): string =>
   new Intl.DateTimeFormat("fr-FR", {
@@ -44,6 +49,17 @@ const priorityLabel: Record<Announcement["priority"], string> = {
   warning: "A surveiller",
   info: "Information",
 };
+
+const emptyBoardState = (): BoardState => ({
+  departures: [],
+  arrivals: [],
+});
+
+const emptyLoadedState = (): LoadedState => ({
+  departures: false,
+  arrivals: false,
+  announcements: false,
+});
 
 const readableError = (cause: unknown, fallback: string): string => {
   if (!(cause instanceof Error) || !cause.message.trim()) return fallback;
@@ -72,16 +88,20 @@ export function AccessibleStationApp() {
   const [suggestions, setSuggestions] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("departures");
-  const [board, setBoard] = useState<BoardItem[]>([]);
+  const [boards, setBoards] = useState<BoardState>(() => emptyBoardState());
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [loadedTabs, setLoadedTabs] = useState<LoadedState>(() => emptyLoadedState());
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
-  const [favoritesOpen, setFavoritesOpen] = useState(false);
-  const [isMenuExpanded, setIsMenuExpanded] = useState(false);
-  const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
+  const [searchMode, setSearchMode] = useState<SearchMode>("text");
+  const { favorites, removeFavorite } = useFavorites();
 
   useEffect(() => {
+    if (searchMode !== "text") {
+      setSuggestions([]);
+      return;
+    }
+
     if (selectedStation && query.trim() === selectedStation.name) {
       setSuggestions([]);
       return;
@@ -105,13 +125,14 @@ export function AccessibleStationApp() {
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [query, selectedStation]);
+  }, [query, selectedStation, searchMode]);
 
   useEffect(() => {
     if (!selectedStation) return;
+    if (loadedTabs[activeTab]) return;
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStation, activeTab]);
+  }, [selectedStation, activeTab, loadedTabs]);
 
   const refresh = async () => {
     if (!selectedStation) return;
@@ -122,10 +143,18 @@ export function AccessibleStationApp() {
       if (activeTab === "announcements") {
         setAnnouncements(await stationAnnouncements(selectedStation.id));
       } else {
-        setBoard(await stationBoard(selectedStation.id, activeTab));
+        const items = await stationBoard(selectedStation.id, activeTab);
+        setBoards((currentBoards) => ({
+          ...currentBoards,
+          [activeTab]: items,
+        }));
       }
-      setUpdatedAt(new Date().toISOString());
-      setStatus("Informations mises a jour.");
+      setLoadedTabs((currentLoadedTabs) => ({
+        ...currentLoadedTabs,
+        [activeTab]: true,
+      }));
+      const refreshedAt = new Date().toISOString();
+      setStatus(`Derniere mise à jour : ${formatTime(refreshedAt)}`);
     } catch (cause) {
       setError(readableError(cause, "Informations indisponibles. Reessayez dans quelques instants."));
       setStatus("");
@@ -159,13 +188,28 @@ export function AccessibleStationApp() {
     );
   };
 
-  const visibleBoard = useMemo(() => board, [board]);
+  const visibleBoard = useMemo(() => {
+    if (activeTab === "announcements") return [];
+    return boards[activeTab];
+  }, [activeTab, boards]);
+
+  const clearStationSelection = () => {
+    setSelectedStation(null);
+    setQuery("");
+    setBoards(emptyBoardState());
+    setAnnouncements([]);
+    setLoadedTabs(emptyLoadedState());
+    setActiveTab("departures");
+  };
+
   const selectStation = (station: Station) => {
     setSelectedStation(station);
     setQuery(station.name);
     setSuggestions([]);
-    setFavoritesOpen(false);
-    setIsMenuExpanded(false);
+    setBoards(emptyBoardState());
+    setAnnouncements([]);
+    setLoadedTabs(emptyLoadedState());
+    setActiveTab("departures");
   };
 
   return (
@@ -174,213 +218,175 @@ export function AccessibleStationApp() {
         {!selectedStation && <h1 className="sr-only">SNCF</h1>}
         <div className="app-header-main">
           {selectedStation ? (
-            <h1 className="current-station-name">{selectedStation.name}</h1>
-          ) : (
-            <div className="search-row" role="search">
-              <label className="sr-only" htmlFor="station-search">
-                Nom de gare
-              </label>
-              <Search className="input-icon" aria-hidden="true" />
-              <input
-                id="station-search"
-                value={query}
-                onChange={(event) => {
-                  setQuery(event.target.value);
-                  setFavoritesOpen(false);
-                }}
-                placeholder="Rechercher une gare"
-                autoComplete="off"
-              />
-            </div>
-          )}
-
-          <button
-            className="button-secondary compact-button menu-toggle"
-            type="button"
-            aria-expanded={isMenuExpanded}
-            aria-controls="expanded-menu"
-            onClick={() => setIsMenuExpanded((expanded) => !expanded)}
-          >
-            <span className="button-content">
-              <ChevronDown aria-hidden="true" />
-              <span>Menu</span>
-            </span>
-          </button>
-        </div>
-
-        <nav className={`header-action-bar ${selectedStation ? "" : "is-empty"}`} aria-label="Actions de gare">
-          {selectedStation && (
-            <>
-              <button className="button-secondary compact-button refresh-button" type="button" onClick={refresh}>
-                <span className="button-content">
-                  <RefreshCw aria-hidden="true" />
-                  <span>Actualiser</span>
-                </span>
-              </button>
-
-              <div className="tabs" role="tablist" aria-label="Informations disponibles">
-                <button
-                  className="tab"
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "departures"}
-                  onClick={() => setActiveTab("departures")}
-                >
-                  Departs
-                </button>
-                <button
-                  className="tab"
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "arrivals"}
-                  onClick={() => setActiveTab("arrivals")}
-                >
-                  Arrivees
-                </button>
-                <button
-                  className="tab"
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === "announcements"}
-                  onClick={() => setActiveTab("announcements")}
-                >
-                  Annonces
-                </button>
-              </div>
-            </>
-          )}
-        </nav>
-
-        {isMenuExpanded && (
-          <div id="expanded-menu" className="expanded-menu">
-            <h2 className="sr-only">Menu</h2>
-            <ThemeControls />
-            <div className="quick-actions">
-              <button className="button-secondary compact-button" type="button" onClick={findNearby}>
-                <span className="button-content">
-                  <MapPin aria-hidden="true" />
-                  <span>Autour</span>
-                </span>
-              </button>
+            <div className="current-station-row">
+              <h1 className="current-station-name">{selectedStation.name}</h1>
               <button
-                className="button-secondary compact-button"
+                className="icon-button compact-button"
                 type="button"
-                aria-expanded={favoritesOpen}
-                aria-controls="favorites-panel"
-                onClick={() => {
-                  setFavoritesOpen((open) => !open);
-                  setSuggestions([]);
-                }}
+                aria-label="Supprimer la gare selectionnee"
+                onClick={clearStationSelection}
               >
                 <span className="button-content">
-                  <Star aria-hidden="true" />
-                  <span>Favoris</span>
+                  <X aria-hidden="true" />
+                  <span>Changer</span>
                 </span>
               </button>
             </div>
-            {selectedStation && (
-              <div className="quick-actions">
+          ) : (
+            <div className="search-mode-tabs" role="tablist" aria-label="Methode de recherche">
+              {(["text", "nearby", "favorites"] as const).map((mode) => (
                 <button
-                  className="button-secondary compact-button"
+                  key={mode}
+                  className="tab"
                   type="button"
-                  onClick={() =>
-                    isFavorite(selectedStation.id)
-                      ? removeFavorite(selectedStation.id)
-                      : addFavorite(selectedStation)
-                  }
-                >
-                  <span className="button-content">
-                    <Star aria-hidden="true" />
-                    <span>{isFavorite(selectedStation.id) ? "Retirer favori" : "Ajouter favori"}</span>
-                  </span>
-                </button>
-                <button
-                  className="button-secondary compact-button"
-                  type="button"
-                  aria-label="Effacer la gare selectionnee"
+                  role="tab"
+                  aria-selected={searchMode === mode}
                   onClick={() => {
-                    setSelectedStation(null);
-                    setQuery("");
-                    setBoard([]);
-                    setAnnouncements([]);
-                    setUpdatedAt(null);
-                    setIsMenuExpanded(false);
+                    setSearchMode(mode);
+                    setSuggestions([]);
+                    setError("");
+                    setStatus("");
                   }}
                 >
-                  <span className="button-content">
-                    <X aria-hidden="true" />
-                    <span>Effacer</span>
-                  </span>
+                  {mode === "text" ? "Saisie" : mode === "nearby" ? "Autour" : "Favoris"}
                 </button>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {selectedStation && (
+          <nav className="header-action-bar" aria-label="Actions de gare">
+            <button className="button-secondary compact-button refresh-button" type="button" onClick={refresh}>
+              <span className="button-content">
+                <RefreshCw aria-hidden="true" />
+                <span>Actualiser</span>
+              </span>
+            </button>
+
+            <div className="tabs" role="tablist" aria-label="Informations disponibles">
+              <button
+                className="tab"
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "departures"}
+                onClick={() => setActiveTab("departures")}
+              >
+                Departs
+              </button>
+              <button
+                className="tab"
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "arrivals"}
+                onClick={() => setActiveTab("arrivals")}
+              >
+                Arrivees
+              </button>
+              <button
+                className="tab"
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "announcements"}
+                onClick={() => setActiveTab("announcements")}
+              >
+                Annonces
+              </button>
+            </div>
+          </nav>
         )}
 
         <p className={error ? "status error" : "status"} role="status" aria-live="polite">
           {error || status}
         </p>
 
-        {suggestions.length > 0 && (
-          <ul className="suggestions header-menu" aria-label="Suggestions de gares">
-            {suggestions.map((station) => (
-              <li key={station.id}>
-                <button className="suggestion-button" type="button" onClick={() => selectStation(station)}>
-                  <strong>{station.name}</strong>
-                  {station.distanceMeters ? (
-                    <span className="muted"> - {Math.round(station.distanceMeters)} metres</span>
-                  ) : null}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+      </header>
 
-        {favoritesOpen && (
-          <div id="favorites-panel" className="header-menu" aria-label="Gares favorites">
-            {favorites.length === 0 ? (
-              <p className="muted">Aucune gare favorite.</p>
-            ) : (
-              <ul className="favorite-list">
-                {favorites.map((station) => (
-                  <li className="favorite-row" key={station.id}>
+      {!selectedStation && (
+        <section className="search-mode-panel" aria-label={searchModeLabel[searchMode]}>
+          {searchMode === "text" && (
+            <div className="search-block" role="search">
+              <div className="search-row">
+                <label className="sr-only" htmlFor="station-search">
+                  Nom de gare
+                </label>
+                <Search className="input-icon" aria-hidden="true" />
+                <input
+                  id="station-search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Rechercher une gare"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          )}
+
+          {searchMode === "nearby" && (
+            <button className="button-secondary" type="button" onClick={findNearby}>
+              <span className="button-content">
+                <span>Rechercher autour de moi</span>
+              </span>
+            </button>
+          )}
+
+          {searchMode === "favorites" && (
+            <>
+              {favorites.length === 0 ? (
+                <p className="muted">Aucune gare favorite.</p>
+              ) : (
+                <ul className="favorite-list">
+                  {favorites.map((station) => (
+                    <li className="favorite-row" key={station.id}>
+                      <button className="suggestion-button" type="button" onClick={() => selectStation(station)}>
+                        {station.name}
+                      </button>
+                      <button
+                        className="icon-button compact-button"
+                        type="button"
+                        aria-label={`Retirer ${station.name} des favoris`}
+                        onClick={() => removeFavorite(station.id)}
+                      >
+                        <span className="button-content">
+                          <Trash2 aria-hidden="true" />
+                          <span>Retirer</span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+
+          {suggestions.length > 0 && (
+            <div className="suggestions-section">
+              <ul className="suggestions" aria-label="Suggestions de gares">
+                {suggestions.map((station) => (
+                  <li key={station.id}>
                     <button className="suggestion-button" type="button" onClick={() => selectStation(station)}>
-                      {station.name}
-                    </button>
-                    <button
-                      className="icon-button compact-button"
-                      type="button"
-                      aria-label={`Retirer ${station.name} des favoris`}
-                      onClick={() => removeFavorite(station.id)}
-                    >
-                      <span className="button-content">
-                        <Trash2 aria-hidden="true" />
-                        <span>Retirer</span>
-                      </span>
+                      <strong>{station.name}</strong>
+                      {station.distanceMeters ? (
+                        <span className="muted"> - {Math.round(station.distanceMeters)} metres</span>
+                      ) : null}
                     </button>
                   </li>
                 ))}
               </ul>
-            )}
-          </div>
-        )}
-      </header>
+            </div>
+          )}
+        </section>
+      )}
 
       {!selectedStation && <div className="empty-results-panel" aria-hidden="true" />}
 
       {selectedStation && (
-        <section className="station-content" aria-labelledby="station-title">
-          <div className="station-header">
-            <div>
-              <h2 id="station-title">{selectedStation.name}</h2>
-              {updatedAt && <p className="muted">Derniere mise a jour: {formatTime(updatedAt)}</p>}
-            </div>
-          </div>
+        <section className="station-content" aria-label={`Informations de ${selectedStation.name}`}>
 
           {activeTab === "announcements" ? (
             <AnnouncementList announcements={announcements} />
           ) : (
-            <BoardList items={visibleBoard} />
+            <BoardList items={visibleBoard} type={activeTab} />
           )}
         </section>
       )}
@@ -388,16 +394,18 @@ export function AccessibleStationApp() {
   );
 }
 
-function BoardList({ items }: { items: BoardItem[] }) {
+function BoardList({ items, type }: { items: BoardItem[]; type: BoardType }) {
   if (items.length === 0) return <p className="muted">Aucune information a afficher pour le moment.</p>;
 
   return (
-    <ul className="board-list" aria-label="Tableau des trains">
-      {items.map((item) => (
-        <li className="board-item" key={item.id}>
+    <ul className="board-list" aria-label={type === "departures" ? "Tableau des departs" : "Tableau des arrivees"}>
+      {items.map((item, index) => (
+        <li className="board-item" key={`${type}-${item.id}-${index}`}>
           <div className="board-topline">
             <div>
-              <p className="destination">{item.destination}</p>
+              <p className="destination">
+                {type === "arrivals" ? item.origin ?? "Gare de depart non communiquee" : item.destination}
+              </p>
               <p className="muted">{item.line ?? "Ligne non communiquee"}</p>
             </div>
             <time className="time" dateTime={item.expectedTime ?? item.time}>
@@ -405,6 +413,11 @@ function BoardList({ items }: { items: BoardItem[] }) {
             </time>
           </div>
           <div className="meta">
+            <span className="tag">
+              {type === "arrivals"
+                ? `Depart ${item.origin ?? "non communique"}`
+                : `Destination ${item.destination}`}
+            </span>
             {item.trainNumber && <span className="tag">Train {item.trainNumber}</span>}
             <span className="tag">Voie {item.platform ?? "non communiquee"}</span>
             <span className={`tag ${item.status === "cancelled" ? "danger" : item.status === "delayed" || item.status === "disrupted" ? "warning" : ""}`}>
@@ -414,8 +427,8 @@ function BoardList({ items }: { items: BoardItem[] }) {
               </span>
             </span>
           </div>
-          {item.disruptions.map((disruption) => (
-            <p className="muted" key={disruption.id}>
+          {item.disruptions.map((disruption, index) => (
+            <p className="muted" key={`${disruption.id}-${index}`}>
               {disruption.title}
             </p>
           ))}
@@ -436,8 +449,8 @@ function AnnouncementList({ announcements }: { announcements: Announcement[] }) 
 
   return (
     <ul className="announcement-list" aria-label="Annonces textuelles">
-      {announcements.map((announcement) => (
-        <li className="announcement" key={announcement.id} data-priority={announcement.priority}>
+      {announcements.map((announcement, index) => (
+        <li className="announcement" key={`${announcement.id}-${index}`} data-priority={announcement.priority}>
           <p className="announcement-priority">
             <PriorityIcon priority={announcement.priority} />
             <span>{priorityLabel[announcement.priority]}</span>

@@ -54,10 +54,15 @@ export class SncfBoardAdapter {
       const linkedDisruptions = mapLinkedDisruptions(stopDate.links, disruptions);
 
       return {
-        id: `${display?.code ?? "train"}-${realtimeTime ?? baseTime ?? index}`,
+        id: `${type}-${display?.code ?? "train"}-${realtimeTime ?? baseTime ?? "time-unknown"}-${index}`,
         time: toIsoDate(baseTime ?? realtimeTime),
         expectedTime: realtimeTime && realtimeTime !== baseTime ? toIsoDate(realtimeTime) : undefined,
-        destination: compact(display?.direction) ?? compact(display?.headsign) ?? "Destination non communiquee",
+        destination: type === "departures"
+          ? compact(display?.direction) ?? compact(display?.headsign) ?? "Destination non communiquee"
+          : "Cette gare",
+        origin: type === "arrivals"
+          ? compact(display?.direction) ?? compact(display?.headsign) ?? "Gare de depart non communiquee"
+          : undefined,
         line: compact(display?.label) ?? compact(display?.name),
         trainNumber: compact(display?.code),
         platform: undefined,

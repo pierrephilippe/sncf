@@ -4,7 +4,7 @@ import AxeBuilder from "@axe-core/playwright";
 test("accueil mobile accessible sans violation axe critique", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByLabel("Nom de gare")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Methode de recherche" })).toBeVisible();
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
@@ -88,7 +88,93 @@ test("les suggestions disparaissent apres selection d'une gare", async ({ page }
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
 
   await expect(page.getByRole("button", { name: /lyon part dieu/i })).not.toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Lyon Part Dieu" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Lyon Part Dieu" })).toBeVisible();
+});
+
+test("les boutons de recherche basculent entre saisie, autour et favoris", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("tablist", { name: "Methode de recherche" })).toBeVisible();
+  await expect(page.getByLabel("Nom de gare")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Autour" }).click();
+  await expect(page.getByRole("button", { name: "Rechercher autour de moi" })).toBeVisible();
+  await expect(page.getByLabel("Nom de gare")).not.toBeVisible();
+
+  await page.getByRole("tab", { name: "Favoris" }).click();
+  await expect(page.getByText("Aucune gare favorite.")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Saisie" }).click();
+  await expect(page.getByLabel("Nom de gare")).toBeVisible();
+});
+
+test("les onglets conservent des informations distinctes pour departs et arrivees", async ({ page }) => {
+  await page.route("**/api/stations/search**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([
+        {
+          id: "stop_area:SNCF:87723197",
+          name: "Lyon Part Dieu",
+          city: "Lyon",
+          source: "sncf",
+        },
+      ]),
+    });
+  });
+
+  await page.route("**/api/stations/*/board**", async (route) => {
+    const type = new URL(route.request().url()).searchParams.get("type");
+    const body = type === "arrivals"
+      ? [
+          {
+            id: "arrival-1",
+            time: "2026-06-20T16:05:00+01:00",
+            destination: "Cette gare",
+            origin: "Marseille Saint-Charles",
+            line: "TGV INOUI",
+            trainNumber: "123456",
+            platform: "4",
+            status: "on_time",
+            disruptions: [],
+          },
+        ]
+      : [
+          {
+            id: "departure-1",
+            time: "2026-06-20T14:08:00+01:00",
+            destination: "Paris Gare de Lyon",
+            line: "TER",
+            trainNumber: "876543",
+            platform: "2",
+            status: "on_time",
+            disruptions: [],
+          },
+        ];
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(body),
+    });
+  });
+
+  await page.goto("/");
+  await page.getByLabel("Nom de gare").fill("Lyon");
+  await page.getByRole("button", { name: /lyon part dieu/i }).click();
+
+  await expect(page.getByText("Paris Gare de Lyon", { exact: true })).toBeVisible();
+  await expect(page.getByText("Marseille Saint-Charles", { exact: true })).not.toBeVisible();
+
+  await page.getByRole("tab", { name: "Arrivees" }).click();
+  await expect(page.getByText("Marseille Saint-Charles", { exact: true })).toBeVisible();
+  await expect(page.getByText("Depart Marseille Saint-Charles")).toBeVisible();
+  await expect(page.getByText("Paris Gare de Lyon", { exact: true })).not.toBeVisible();
+
+  await page.getByRole("tab", { name: "Departs" }).click();
+  await expect(page.getByText("Paris Gare de Lyon", { exact: true })).toBeVisible();
+  await expect(page.getByText("Marseille Saint-Charles", { exact: true })).not.toBeVisible();
 });
 
 test("le menu fixe reste stable au scroll avec la barre d'actions", async ({ page }) => {
@@ -129,18 +215,15 @@ test("le menu fixe reste stable au scroll avec la barre d'actions", async ({ pag
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
-  await expect(page.getByRole("heading", { level: 2, name: "Lyon Part Dieu" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Lyon Part Dieu" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Actualiser" })).toBeVisible();
 
   await page.mouse.wheel(0, 900);
-  await expect(page.getByRole("button", { name: "Menu" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Actualiser" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Departs" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Arrivees" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Annonces" })).toBeVisible();
   await expect(page.getByText("Lyon Part Dieu").first()).toBeVisible();
 
-  await page.getByRole("button", { name: "Menu" }).click();
-  await expect(page.getByRole("button", { name: "Autour" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Lyon Part Dieu" })).toBeVisible();
 });
