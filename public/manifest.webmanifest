@@ -1,0 +1,11 @@
+{
+  "name": "Accessibilite SNCF",
+  "short_name": "SNCF Accessible",
+  "description": "Informations voyageurs SNCF dans une interface mobile accessible.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#003b5c",
+  "lang": "fr-FR",
+  "icons": []
+}
