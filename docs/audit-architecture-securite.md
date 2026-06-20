@@ -234,12 +234,14 @@ Correction appliquee :
 - L'adapter ne copie plus `display_informations.direction` dans `origin` pour les arrivees.
 - Si `route.stop_points` contient une liste de gares, la premiere gare desservie est utilisee comme origine.
 - Le repository resout les liens SNCF `rel: "origins"` de type `stop_area` via `/coverage/sncf/stop_areas/{id}` et remplace l'origine uniquement quand un nom officiel est obtenu.
+- Pour les departs, le repository resout separement le lien SNCF `rel: "terminus"` et remplace uniquement la destination.
+- Les cards n'utilisent donc pas la meme information selon l'onglet : Depart affiche `destination`, Arrivee affiche `origin`.
 - Si l'origine ne peut pas etre resolue, l'interface conserve l'etat "Gare de depart non communiquee" au lieu d'afficher une information fausse.
 
 Verification :
 
 - Test unitaire adapter : ne pas inventer l'origine depuis `direction`.
-- Test unitaire repository : resolution d'une origine `stop_area` SNCF.
+- Tests unitaires repository : resolution d'une origine `origins` pour les arrivees et d'une destination `terminus` pour les departs, sans melange entre `origin` et `destination`.
 - Verification API reelle Nancy : `direction` reste `Nancy (Nancy)`, tandis que les origines resolues sont des gares distinctes comme Bar-le-Duc, Luneville, Metz, Mirecourt ou Remiremont.
 
 ### DATA-002 - Enrichissement du suivi de train

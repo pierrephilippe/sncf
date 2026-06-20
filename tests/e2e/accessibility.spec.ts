@@ -206,7 +206,7 @@ test("les onglets conservent des informations distinctes pour dÃ©parts et arrivÃ
       ? [
           {
             id: "arrival-1",
-            time: "2026-06-20T16:05:00+01:00",
+            time: "2026-06-20T16:05:00+02:00",
             destination: "Cette gare",
             origin: "Marseille Saint-Charles",
             line: "TGV INOUI",
@@ -219,7 +219,7 @@ test("les onglets conservent des informations distinctes pour dÃ©parts et arrivÃ
       : [
           {
             id: "departure-1",
-            time: "2026-06-20T14:08:00+01:00",
+            time: "2026-06-20T14:08:00+02:00",
             destination: "Paris Gare de Lyon",
             line: "TER",
             trainNumber: "876543",
@@ -670,7 +670,7 @@ test("le menu fixe reste stable au scroll avec la barre d'actions", async ({ pag
       body: JSON.stringify(
         Array.from({ length: 18 }, (_, index) => ({
           id: `train-${index}`,
-          time: "2026-06-20T12:00:00+01:00",
+          time: "2026-06-20T12:00:00+02:00",
           destination: `Destination ${index + 1}`,
           line: "TER",
           trainNumber: `87${index}`,

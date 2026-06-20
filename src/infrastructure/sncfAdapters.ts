@@ -6,6 +6,8 @@ const compact = (value: string | undefined): string | undefined => {
   return trimmed ? trimmed : undefined;
 };
 
+const SNCF_TIME_ZONE = "Europe/Paris";
+
 const looksLikeRouteLabel = (value: string | undefined): boolean =>
   Boolean(value && /\s[-–—]\s/.test(value));
 
@@ -122,13 +124,54 @@ const toCoordinates = (lat?: string, lon?: string) => {
 
 const toIsoDate = (sncfDate?: string): string => {
   if (!sncfDate || !/^\d{8}T\d{6}$/.test(sncfDate)) return new Date().toISOString();
-  const year = sncfDate.slice(0, 4);
-  const month = sncfDate.slice(4, 6);
-  const day = sncfDate.slice(6, 8);
-  const hour = sncfDate.slice(9, 11);
-  const minute = sncfDate.slice(11, 13);
-  const second = sncfDate.slice(13, 15);
-  return `${year}-${month}-${day}T${hour}:${minute}:${second}+01:00`;
+  const year = Number(sncfDate.slice(0, 4));
+  const month = Number(sncfDate.slice(4, 6));
+  const day = Number(sncfDate.slice(6, 8));
+  const hour = Number(sncfDate.slice(9, 11));
+  const minute = Number(sncfDate.slice(11, 13));
+  const second = Number(sncfDate.slice(13, 15));
+
+  return parisWallTimeToIso(year, month, day, hour, minute, second);
+};
+
+const parisWallTimeToIso = (
+  year: number,
+  month: number,
+  day: number,
+  hour: number,
+  minute: number,
+  second: number,
+): string => {
+  const wallTimeAsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  let timestamp = wallTimeAsUtc - timeZoneOffsetMs(new Date(wallTimeAsUtc), SNCF_TIME_ZONE);
+  timestamp = wallTimeAsUtc - timeZoneOffsetMs(new Date(timestamp), SNCF_TIME_ZONE);
+  return new Date(timestamp).toISOString();
+};
+
+const timeZoneOffsetMs = (date: Date, timeZone: string): number => {
+  const parts = new Intl.DateTimeFormat("fr-FR", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value ?? 0);
+  const zonedTimestamp = Date.UTC(
+    value("year"),
+    value("month") - 1,
+    value("day"),
+    value("hour"),
+    value("minute"),
+    value("second"),
+  );
+
+  return zonedTimestamp - date.getTime();
 };
 
 const inferStatus = (

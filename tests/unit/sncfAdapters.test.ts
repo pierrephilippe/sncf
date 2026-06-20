@@ -7,9 +7,48 @@ describe("SncfBoardAdapter", () => {
     const [item] = new SncfBoardAdapter().fromBoard(delayedDepartureFixture, "departures");
 
     expect(item.destination).toBe("Lyon Part Dieu");
+    expect(item.origin).toBeUndefined();
     expect(item.trainNumber).toBe("876543");
     expect(item.status).toBe("delayed");
     expect(item.disruptions[0].title).toBe("Retard");
+  });
+
+  it("interprete les horaires SNCF d'ete comme des heures de Paris", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        departures: [
+          {
+            display_informations: { code: "876543", direction: "Paris Gare de Lyon" },
+            stop_date_time: {
+              base_departure_date_time: "20260620T140800",
+              departure_date_time: "20260620T140800",
+            },
+          },
+        ],
+      },
+      "departures",
+    );
+
+    expect(item.time).toBe("2026-06-20T12:08:00.000Z");
+  });
+
+  it("interprete les horaires SNCF d'hiver comme des heures de Paris", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        departures: [
+          {
+            display_informations: { code: "876543", direction: "Paris Gare de Lyon" },
+            stop_date_time: {
+              base_departure_date_time: "20260120T140800",
+              departure_date_time: "20260120T140800",
+            },
+          },
+        ],
+      },
+      "departures",
+    );
+
+    expect(item.time).toBe("2026-01-20T13:08:00.000Z");
   });
 
   it("normalise une arrivée sans inventer la gare de départ depuis la direction", () => {

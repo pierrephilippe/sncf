@@ -71,9 +71,27 @@ export class SncfBoardRepository implements BoardRepository {
     const parsedResponse = boardResponseSchema.parse(response.value);
     const board = this.adapter.fromBoard(parsedResponse, type);
 
-    if (type !== "arrivals") return board;
+    if (type === "departures") return this.withResolvedDepartureDestinations(board, parsedResponse);
+    if (type === "arrivals") return this.withResolvedArrivalOrigins(board, parsedResponse);
 
-    return this.withResolvedArrivalOrigins(board, parsedResponse);
+    return board;
+  }
+
+  private async withResolvedDepartureDestinations(board: BoardItem[], response: BoardResponse): Promise<BoardItem[]> {
+    const terminusIds = (response.departures ?? []).map((departure) => findLinkedStopAreaId(
+      departure.stop_date_time.links,
+      "terminus",
+    ));
+    const uniqueTerminusIds = Array.from(new Set(terminusIds.filter((id): id is string => Boolean(id))));
+
+    if (uniqueTerminusIds.length === 0) return board;
+
+    const destinationNames = await this.resolveStopAreaNames(uniqueTerminusIds);
+
+    return board.map((item, index) => {
+      const destinationName = destinationNames.get(terminusIds[index] ?? "");
+      return destinationName ? { ...item, destination: destinationName } : item;
+    });
   }
 
   private async withResolvedArrivalOrigins(board: BoardItem[], response: BoardResponse): Promise<BoardItem[]> {
