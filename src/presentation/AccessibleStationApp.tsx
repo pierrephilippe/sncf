@@ -186,12 +186,10 @@ const isBoardItem = (value: unknown): value is BoardItem =>
   value !== null &&
   "id" in value &&
   "time" in value &&
-  "destination" in value &&
   "status" in value &&
   "disruptions" in value &&
   typeof value.id === "string" &&
   typeof value.time === "string" &&
-  typeof value.destination === "string" &&
   Array.isArray(value.disruptions);
 
 const isTrackedTrain = (value: unknown): value is TrackedTrain => {
@@ -204,6 +202,7 @@ const isTrackedTrain = (value: unknown): value is TrackedTrain => {
 };
 
 const readNavigationState = (): NavigationState | null => {
+  if (typeof window === "undefined") return null;
   const raw = window.localStorage.getItem(NAVIGATION_STORAGE_KEY);
   if (!raw) return null;
 
@@ -230,46 +229,28 @@ const readNavigationState = (): NavigationState | null => {
 };
 
 const writeNavigationState = (state: NavigationState) => {
+  if (typeof window === "undefined") return;
   window.localStorage.setItem(NAVIGATION_STORAGE_KEY, JSON.stringify(state));
 };
 
 export function AccessibleStationApp() {
-  const [query, setQuery] = useState("");
+  const [initialNavigation] = useState<NavigationState | null>(() => readNavigationState());
+  const [query, setQuery] = useState(initialNavigation?.query ?? "");
   const [suggestions, setSuggestions] = useState<Station[]>([]);
-  const [selectedStation, setSelectedStation] = useState<Station | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>("departures");
+  const [selectedStation, setSelectedStation] = useState<Station | null>(initialNavigation?.selectedStation ?? null);
+  const [activeTab, setActiveTab] = useState<Tab>(initialNavigation?.activeTab ?? "departures");
   const [boards, setBoards] = useState<BoardState>(() => emptyBoardState());
   const [announcements, setAnnouncements] = useState<AnnouncementState>([]);
   const [loadedTabs, setLoadedTabs] = useState<LoadedState>(() => emptyLoadedState());
   const [paging, setPaging] = useState<PagingState>(() => emptyPagingState());
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
-  const [searchMode, setSearchMode] = useState<SearchMode>("text");
-  const [trackedTrain, setTrackedTrain] = useState<TrackedTrain | null>(null);
+  const [searchMode, setSearchMode] = useState<SearchMode>(initialNavigation?.searchMode ?? "text");
+  const [trackedTrain, setTrackedTrain] = useState<TrackedTrain | null>(initialNavigation?.trackedTrain ?? null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
-  const navigationRestoredRef = useRef(false);
-  const skipNextNavigationSaveRef = useRef(true);
   const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
 
   useEffect(() => {
-    const storedNavigation = readNavigationState();
-    navigationRestoredRef.current = true;
-    if (!storedNavigation) return;
-
-    setSelectedStation(storedNavigation.selectedStation);
-    setActiveTab(storedNavigation.activeTab);
-    setSearchMode(storedNavigation.searchMode);
-    setQuery(storedNavigation.query);
-    setTrackedTrain(storedNavigation.trackedTrain);
-  }, []);
-
-  useEffect(() => {
-    if (!navigationRestoredRef.current) return;
-    if (skipNextNavigationSaveRef.current) {
-      skipNextNavigationSaveRef.current = false;
-      return;
-    }
-
     writeNavigationState({
       selectedStation,
       activeTab,
