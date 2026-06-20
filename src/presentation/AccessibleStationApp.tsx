@@ -619,7 +619,7 @@ export function AccessibleStationApp() {
                 aria-selected={activeTab === "announcements"}
                 onClick={() => setActiveTab("announcements")}
               >
-                Annonces
+                Alertes
               </button>
             </div>
           </nav>
@@ -986,10 +986,10 @@ function AnnouncementList({ announcements }: { announcements: Announcement[] }) 
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
   };
 
-  if (announcements.length === 0) return <p className="muted">Aucune annonce prioritaire pour le moment.</p>;
+  if (announcements.length === 0) return <p className="muted">Aucune alerte prioritaire pour le moment.</p>;
 
   return (
-    <ul className="announcement-list" aria-label="Annonces textuelles">
+    <ul className="announcement-list" aria-label="Alertes textuelles">
       {announcements.map((announcement, index) => (
         <li className="announcement" key={`${announcement.id}-${index}`} data-priority={announcement.priority}>
           <p className="announcement-priority">

@@ -1,6 +1,6 @@
 # Accessibilite SNCF
 
-Web app mobile-first pour consulter les informations voyageurs SNCF dans une interface accessible: departs, arrivees, perturbations et annonces textuelles reconstruites.
+Web app mobile-first pour consulter les informations voyageurs SNCF dans une interface accessible: departs, arrivees, perturbations et alertes textuelles reconstruites.
 
 ## Demarrage
 

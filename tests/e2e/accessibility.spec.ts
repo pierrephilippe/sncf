@@ -654,7 +654,7 @@ test("le menu fixe reste stable au scroll avec la barre d'actions", async ({ pag
   await expect(page.getByRole("button", { name: "Actualiser" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Departs" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Arrivees" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Annonces" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Alertes" })).toBeVisible();
   await expect(page.getByText("Lyon Part Dieu").first()).toBeVisible();
 
   await expect(page.getByRole("heading", { level: 1, name: "Lyon Part Dieu" })).toBeVisible();
