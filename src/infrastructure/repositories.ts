@@ -6,10 +6,12 @@ import {
   boardResponseSchema,
   nearbyResponseSchema,
   placesResponseSchema,
+  stopAreasResponseSchema,
   vehicleJourneyResponseSchema,
   type BoardResponse,
   type NearbyResponse,
   type PlacesResponse,
+  type StopAreasResponse,
   type VehicleJourneyResponse,
 } from "./sncfSchemas";
 
@@ -66,7 +68,49 @@ export class SncfBoardRepository implements BoardRepository {
     );
     if (!response.ok) throw response.error;
 
-    return this.adapter.fromBoard(boardResponseSchema.parse(response.value), type);
+    const parsedResponse = boardResponseSchema.parse(response.value);
+    const board = this.adapter.fromBoard(parsedResponse, type);
+
+    if (type !== "arrivals") return board;
+
+    return this.withResolvedArrivalOrigins(board, parsedResponse);
+  }
+
+  private async withResolvedArrivalOrigins(board: BoardItem[], response: BoardResponse): Promise<BoardItem[]> {
+    const originIds = (response.arrivals ?? []).map((arrival) => findLinkedStopAreaId(
+      arrival.stop_date_time.links,
+      "origins",
+    ));
+    const uniqueOriginIds = Array.from(new Set(originIds.filter((id): id is string => Boolean(id))));
+
+    if (uniqueOriginIds.length === 0) return board;
+
+    const originNames = await this.resolveStopAreaNames(uniqueOriginIds);
+
+    return board.map((item, index) => {
+      const originName = originNames.get(originIds[index] ?? "");
+      return originName ? { ...item, origin: originName } : item;
+    });
+  }
+
+  private async resolveStopAreaNames(stopAreaIds: string[]): Promise<Map<string, string>> {
+    const entries = await Promise.all(
+      stopAreaIds.map(async (stopAreaId): Promise<[string, string] | null> => {
+        try {
+          const response = await this.client.get<StopAreasResponse>(
+            `/coverage/sncf/stop_areas/${encodeURIComponent(stopAreaId)}`,
+          );
+          if (!response.ok) return null;
+
+          const stopArea = stopAreasResponseSchema.parse(response.value).stop_areas[0];
+          return stopArea?.name ? [stopAreaId, stopArea.name] : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    return new Map(entries.filter((entry): entry is [string, string] => Boolean(entry)));
   }
 }
 
@@ -108,3 +152,9 @@ const toSncfDateTime = (isoDate: string): string => {
 
   return `${value("year")}${value("month")}${value("day")}T${value("hour")}${value("minute")}${value("second")}`;
 };
+
+const findLinkedStopAreaId = (
+  links: Array<{ id?: string; rel?: string; type?: string }> | undefined,
+  rel: "origins" | "terminus",
+): string | undefined =>
+  links?.find((link) => link.type === "stop_area" && link.rel === rel && link.id)?.id;

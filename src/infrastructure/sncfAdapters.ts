@@ -26,7 +26,7 @@ export class SncfStationAdapter {
       .map((stopArea) => ({
         id: stopArea.id,
         name: stopArea.name,
-        city: inferCity(stopArea.name),
+        city: inferCity(stopArea.label ?? stopArea.name) ?? stopArea.name,
         coordinates: toCoordinates(stopArea.coord?.lat, stopArea.coord?.lon),
         source: "sncf" as const,
       }));
@@ -41,7 +41,7 @@ export class SncfStationAdapter {
         return [{
           id: stopArea.id,
           name: stopArea.name,
-          city: inferCity(stopArea.name),
+          city: inferCity(stopArea.label ?? stopArea.name) ?? stopArea.name,
           coordinates: toCoordinates(stopArea.coord?.lat, stopArea.coord?.lon),
           source: "sncf" as const,
           distanceMeters: place.distance === undefined ? undefined : Number(place.distance),
@@ -65,6 +65,7 @@ export class SncfBoardAdapter {
         type === "departures" ? stopDate.departure_date_time : stopDate.arrival_date_time;
       const linkedDisruptions = mapLinkedDisruptions(stopDate.links, disruptions);
       const routeLabel = routeLabelFromDisplay(display?.label, display?.name, entry.route?.name);
+      const servedStations = mapServedStations(entry.route?.stop_points);
 
       return {
         id: `${type}-${display?.code ?? "train"}-${realtimeTime ?? baseTime ?? "time-unknown"}-${index}`,
@@ -75,9 +76,9 @@ export class SncfBoardAdapter {
           ? compact(display?.direction)
           : undefined,
         origin: type === "arrivals"
-          ? compact(display?.direction)
+          ? servedStations?.[0]
           : undefined,
-        servedStations: mapServedStations(entry.route?.stop_points),
+        servedStations,
         line: compact(display?.commercial_mode) ?? compact(display?.physical_mode),
         routeLabel,
         trainNumber: trainNumberFromDisplay(display?.code, display?.headsign),

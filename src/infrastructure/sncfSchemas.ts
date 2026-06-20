@@ -8,6 +8,7 @@ const coordSchema = z.object({
 const stopAreaSchema = z.object({
   id: z.string(),
   name: z.string(),
+  label: z.string().optional(),
   coord: coordSchema.optional(),
 });
 
@@ -65,13 +66,19 @@ const displayInformationSchema = z.object({
   physical_mode: z.string().optional(),
 });
 
+const linkSchema = z.object({
+  id: z.string().optional(),
+  rel: z.string().optional(),
+  type: z.string().optional(),
+});
+
 const stopDateTimeSchema = z.object({
   base_departure_date_time: z.string().optional(),
   departure_date_time: z.string().optional(),
   base_arrival_date_time: z.string().optional(),
   arrival_date_time: z.string().optional(),
   data_freshness: z.string().optional(),
-  links: z.array(z.object({ id: z.string().optional(), rel: z.string().optional(), type: z.string().optional() })).optional(),
+  links: z.array(linkSchema).optional(),
 });
 
 const boardEntrySchema = z.object({
@@ -109,7 +116,12 @@ export const vehicleJourneyResponseSchema = z.object({
   vehicle_journeys: z.array(vehicleJourneySchema).optional(),
 });
 
+export const stopAreasResponseSchema = z.object({
+  stop_areas: z.array(stopAreaSchema).default([]),
+});
+
 export type PlacesResponse = z.infer<typeof placesResponseSchema>;
 export type NearbyResponse = z.infer<typeof nearbyResponseSchema>;
 export type BoardResponse = z.infer<typeof boardResponseSchema>;
 export type VehicleJourneyResponse = z.infer<typeof vehicleJourneyResponseSchema>;
+export type StopAreasResponse = z.infer<typeof stopAreasResponseSchema>;

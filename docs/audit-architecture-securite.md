@@ -22,6 +22,7 @@ Les principaux risques identifies concernent surtout l'exposition publique des r
 | ARCH-002 | Moyen | `BoardItem` pourrait devenir un type discrimine depart/arrivee | A evaluer | 2026-06-20 |
 | DATA-001 | Faible | Favoris `localStorage` lus sans validation structuree | A traiter | 2026-06-20 |
 | DATA-002 | Moyen | Enrichissement origine/destination via `vehicle_journey` uniquement sur la page de suivi | Traite | 2026-06-20 |
+| DATA-003 | Important | Arrivees SNCF : `display_informations.direction` peut designer la gare d'arrivee, pas l'origine | Traite | 2026-06-20 |
 | ACC-001 | Important | Rendu homogene et explicite des erreurs API avec `role=alert` | Traite | 2026-06-20 |
 | PWA-001 | Important | Installation PWA avec service worker sans cache des donnees SNCF temps reel | Traite | 2026-06-20 |
 
@@ -217,6 +218,29 @@ Recommandation :
 - Valider les favoris lus avec Zod.
 - Supprimer la valeur stockee si le schema est invalide.
 - Limiter explicitement le nombre et la taille des champs stockes.
+
+### DATA-003 - Origine des trains a l'arrivee
+
+Priorite : Important
+
+Statut : Traite le 2026-06-20
+
+Constat :
+
+Sur les arrivees de Nancy, `display_informations.direction` vaut par exemple `Nancy (Nancy)`. L'application utilisait ce champ comme gare de depart, ce qui affichait a tort Nancy comme origine de tous les trains a l'arrivee.
+
+Correction appliquee :
+
+- L'adapter ne copie plus `display_informations.direction` dans `origin` pour les arrivees.
+- Si `route.stop_points` contient une liste de gares, la premiere gare desservie est utilisee comme origine.
+- Le repository resout les liens SNCF `rel: "origins"` de type `stop_area` via `/coverage/sncf/stop_areas/{id}` et remplace l'origine uniquement quand un nom officiel est obtenu.
+- Si l'origine ne peut pas etre resolue, l'interface conserve l'etat "Gare de depart non communiquee" au lieu d'afficher une information fausse.
+
+Verification :
+
+- Test unitaire adapter : ne pas inventer l'origine depuis `direction`.
+- Test unitaire repository : resolution d'une origine `stop_area` SNCF.
+- Verification API reelle Nancy : `direction` reste `Nancy (Nancy)`, tandis que les origines resolues sont des gares distinctes comme Bar-le-Duc, Luneville, Metz, Mirecourt ou Remiremont.
 
 ### DATA-002 - Enrichissement du suivi de train
 

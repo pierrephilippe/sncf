@@ -12,14 +12,43 @@ describe("SncfBoardAdapter", () => {
     expect(item.disruptions[0].title).toBe("Retard");
   });
 
-  it("normalise une arrivee avec sa gare de depart", () => {
+  it("normalise une arrivée sans inventer la gare de départ depuis la direction", () => {
     const [item] = new SncfBoardAdapter().fromBoard(arrivalFixture, "arrivals");
 
-    expect(item.origin).toBe("Marseille Saint-Charles");
+    expect(item.origin).toBeUndefined();
     expect(item.destination).toBeUndefined();
     expect(item.line).toBe("TGV INOUI");
     expect(item.trainNumber).toBe("123456");
     expect(item.status).toBe("on_time");
+  });
+
+  it("utilise la première gare desservie comme origine d'une arrivée quand elle est fournie", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        arrivals: [
+          {
+            display_informations: {
+              code: "123456",
+              direction: "Nancy",
+            },
+            stop_date_time: {
+              base_arrival_date_time: "20260620T160500",
+              arrival_date_time: "20260620T160500",
+            },
+            route: {
+              stop_points: [
+                { name: "Marseille Saint-Charles" },
+                { name: "Avignon TGV" },
+                { name: "Nancy" },
+              ],
+            },
+          },
+        ],
+      },
+      "arrivals",
+    );
+
+    expect(item.origin).toBe("Marseille Saint-Charles");
   });
 
   it("genere des identifiants uniques si deux trains partagent le meme code et horaire", () => {

@@ -155,6 +155,10 @@ test("une gare sélectionnée peut être ajoutée aux favoris depuis l'en-tête"
 
   const addFavoriteButton = page.getByRole("button", { name: "Ajouter Lyon Part Dieu aux favoris" });
   await expect(addFavoriteButton).toBeVisible();
+  await expect(page.getByRole("link", { name: "Gares et services SNCF" })).toHaveAttribute(
+    "href",
+    "https://www.garesetconnexions.sncf/fr/gares-services/",
+  );
   await addFavoriteButton.click();
   await expect(addFavoriteButton).not.toBeVisible();
 

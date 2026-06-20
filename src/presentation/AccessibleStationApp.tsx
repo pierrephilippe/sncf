@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Clock3,
+  ExternalLink,
   Info,
   Megaphone,
   RefreshCw,
@@ -47,6 +48,7 @@ type NavigationState = {
 
 const PAGE_SIZE = 20;
 const NAVIGATION_STORAGE_KEY = "sncf-accessibilite:navigation";
+const OFFICIAL_SNCF_GARES_URL = "https://www.garesetconnexions.sncf/fr/gares-services/";
 
 const searchModeLabel: Record<SearchMode, string> = {
   text: "Recherche par saisie",
@@ -626,7 +628,6 @@ export function AccessibleStationApp() {
                 <span>Actualiser</span>
               </span>
             </button>
-
             <div className="tabs" role="tablist" aria-label="Informations disponibles">
               <button
                 className="tab"
@@ -755,6 +756,19 @@ export function AccessibleStationApp() {
 
       {selectedStation && (
         <section className="station-content" aria-label={`Informations de ${selectedStation.name}`}>
+          {!trackedTrain && (
+            <a
+              className="button-secondary official-results-link"
+              href={OFFICIAL_SNCF_GARES_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="button-content">
+                <ExternalLink aria-hidden="true" />
+                <span>Gares et services SNCF</span>
+              </span>
+            </a>
+          )}
 
           {trackedTrain ? (
             <TrainTrackingView
