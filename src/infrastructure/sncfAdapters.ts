@@ -22,20 +22,19 @@ export class SncfStationAdapter {
 
   fromNearby(response: NearbyResponse): Station[] {
     return response.places_nearby
-      .map((place) => {
+      .flatMap((place): Station[] => {
         const stopArea = place.stop_area;
-        if (!stopArea) return undefined;
+        if (!stopArea) return [];
 
-        return {
+        return [{
           id: stopArea.id,
           name: stopArea.name,
           city: inferCity(stopArea.name),
           coordinates: toCoordinates(stopArea.coord?.lat, stopArea.coord?.lon),
           source: "sncf" as const,
           distanceMeters: place.distance === undefined ? undefined : Number(place.distance),
-        };
+        }];
       })
-      .filter((station): station is Station => Boolean(station))
       .sort((a, b) => (a.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (b.distanceMeters ?? Number.MAX_SAFE_INTEGER));
   }
 }
