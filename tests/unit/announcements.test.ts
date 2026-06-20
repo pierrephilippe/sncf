@@ -29,7 +29,7 @@ describe("AnnouncementService", () => {
     const announcements = service.fromBoard(items, "2026-06-20T10:00:00Z");
 
     expect(announcements[0].priority).toBe("critical");
-    expect(announcements[0].text).toContain("supprime");
+    expect(announcements[0].text).toContain("supprimé");
     expect(announcements[1].priority).toBe("warning");
   });
 });

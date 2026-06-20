@@ -26,12 +26,12 @@ const formatTime = (isoDate: string): string => {
 };
 
 const statusText = (item: BoardItem): string => {
-  if (item.status === "cancelled") return "supprime";
+  if (item.status === "cancelled") return "supprimé";
   if (item.status === "delayed" && item.expectedTime) {
-    return `retarde, nouvel horaire ${formatTime(item.expectedTime)}`;
+    return `retardé, nouvel horaire ${formatTime(item.expectedTime)}`;
   }
   if (item.status === "disrupted") return "perturbe";
-  if (item.status === "on_time") return "a l'heure";
+  if (item.status === "on_time") return "à l'heure";
   return "statut non confirme";
 };
 
@@ -54,12 +54,12 @@ export class AnnouncementService {
   private buildText(item: BoardItem): string {
     const train = item.trainNumber ? `Train ${item.trainNumber}` : "Train";
     const line = item.line ? `, ligne ${item.line}` : "";
-    const platform = item.platform ? `, voie ${item.platform}` : ", voie non communiquee";
+    const platform = item.platform ? `, voie ${item.platform}` : ", voie non communiquée";
     const disruption = item.disruptions[0]?.title
       ? `. Information: ${item.disruptions[0].title}.`
       : ".";
 
-    return `${train}${line} vers ${item.destination ?? "destination non communiquee"}, depart ${formatTime(
+    return `${train}${line} vers ${item.destination ?? "destination non communiquée"}, départ ${formatTime(
       item.time,
     )}${platform}, ${statusText(item)}${disruption}`;
   }

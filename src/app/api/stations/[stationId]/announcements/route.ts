@@ -11,12 +11,12 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   const searchParams = new URL(request.url).searchParams;
   const page = Number(searchParams.get("page") ?? 0);
   if (!Number.isInteger(page) || page < 0) {
-    return badRequest("La page doit etre un entier positif.");
+    return badRequest("La page doit être un entier positif.");
   }
 
   const fromDateTime = searchParams.get("fromDateTime") ?? undefined;
   if (fromDateTime && Number.isNaN(new Date(fromDateTime).getTime())) {
-    return badRequest("La date de debut est invalide.");
+    return badRequest("La date de début est invalide.");
   }
 
   try {

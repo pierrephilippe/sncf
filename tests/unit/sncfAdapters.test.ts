@@ -3,7 +3,7 @@ import { SncfBoardAdapter } from "@/infrastructure/sncfAdapters";
 import { arrivalFixture, delayedDepartureFixture } from "../fixtures/sncfBoard";
 
 describe("SncfBoardAdapter", () => {
-  it("normalise un depart retarde depuis l'API SNCF", () => {
+  it("normalise un départ retardé depuis l'API SNCF", () => {
     const [item] = new SncfBoardAdapter().fromBoard(delayedDepartureFixture, "departures");
 
     expect(item.destination).toBe("Lyon Part Dieu");

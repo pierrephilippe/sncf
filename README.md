@@ -1,6 +1,6 @@
 # SNCFady
 
-Web app mobile-first pour consulter les informations voyageurs SNCF dans une interface accessible: departs, arrivees, perturbations et alertes textuelles reconstruites.
+Web app mobile-first pour consulter les informations voyageurs SNCF dans une interface accessible: départs, arrivées, perturbations et alertes textuelles reconstruites.
 
 ## Demarrage
 
@@ -10,7 +10,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Renseigner `SNCF_API_TOKEN` avec un jeton SNCF API. Sur Netlify, la variable doit etre configuree cote Functions uniquement. `SNCF_API_BASE_URL` est optionnelle: le code utilise l'URL SNCF API v1 par defaut.
+Renseigner `SNCF_API_TOKEN` avec un jeton SNCF API. Sur Netlify, la variable doit être configurée côté Functions uniquement. `SNCF_API_BASE_URL` est optionnelle: le code utilise l'URL SNCF API v1 par défaut.
 
 ## Scripts
 

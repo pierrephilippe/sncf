@@ -12,9 +12,12 @@ export function PwaRegistration() {
       window.location.hostname !== "127.0.0.1"
     ) return;
 
-    void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
-      // La PWA reste utilisable sans service worker.
-    });
+    void navigator.serviceWorker
+      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .then((registration) => registration.update())
+      .catch(() => {
+        // La PWA reste utilisable sans service worker.
+      });
   }, []);
 
   return null;

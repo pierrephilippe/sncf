@@ -16,7 +16,7 @@ export const errorResponse = (error: unknown): Response => {
 
   if (error instanceof ZodError) {
     return Response.json(
-      { error: "La reponse de l'API SNCF est invalide.", code: "validation" },
+      { error: "La réponse de l'API SNCF est invalide.", code: "validation" },
       { status: 502 },
     );
   }

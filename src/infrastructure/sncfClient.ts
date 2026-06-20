@@ -39,7 +39,7 @@ export class FetchSncfHttpClient implements SncfHttpClient {
       });
 
       if (!response.ok) {
-        return err("external_api", "L'API SNCF a retourne une erreur.", response.status);
+        return err("external_api", "L'API SNCF a retourné une erreur.", response.status);
       }
 
       return ok((await response.json()) as T);

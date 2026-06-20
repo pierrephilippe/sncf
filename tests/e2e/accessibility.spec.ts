@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }, testInfo) => {
 test("accueil mobile accessible sans violation axe critique", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByLabel("Nom de gare")).toBeVisible();
-  await expect(page.getByRole("tablist", { name: "Methode de recherche" })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Méthode de recherche" })).toBeVisible();
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
@@ -125,7 +125,7 @@ test("les suggestions disparaissent apres selection d'une gare", async ({ page }
   await expect(page.getByRole("heading", { level: 1, name: "Lyon Part Dieu" })).toBeVisible();
 });
 
-test("une gare selectionnee peut etre ajoutee aux favoris depuis l'en-tete", async ({ page }) => {
+test("une gare sélectionnée peut être ajoutée aux favoris depuis l'en-tête", async ({ page }) => {
   await page.route("**/api/stations/search**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -158,7 +158,7 @@ test("une gare selectionnee peut etre ajoutee aux favoris depuis l'en-tete", asy
   await addFavoriteButton.click();
   await expect(addFavoriteButton).not.toBeVisible();
 
-  await page.getByRole("button", { name: "Supprimer la gare selectionnee" }).click();
+  await page.getByRole("button", { name: "Supprimer la gare sélectionnée" }).click();
   await page.getByRole("tab", { name: "Favoris" }).click();
   await expect(page.getByRole("button", { name: "Lyon Part Dieu", exact: true })).toBeVisible();
 });
@@ -166,7 +166,7 @@ test("une gare selectionnee peut etre ajoutee aux favoris depuis l'en-tete", asy
 test("les boutons de recherche basculent entre saisie, autour et favoris", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("tablist", { name: "Methode de recherche" })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "Méthode de recherche" })).toBeVisible();
   await expect(page.getByLabel("Nom de gare")).toBeVisible();
 
   await page.getByRole("tab", { name: "Autour" }).click();
@@ -180,7 +180,7 @@ test("les boutons de recherche basculent entre saisie, autour et favoris", async
   await expect(page.getByLabel("Nom de gare")).toBeVisible();
 });
 
-test("les onglets conservent des informations distinctes pour departs et arrivees", async ({ page }) => {
+test("les onglets conservent des informations distinctes pour départs et arrivées", async ({ page }) => {
   await page.route("**/api/stations/search**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -239,12 +239,12 @@ test("les onglets conservent des informations distinctes pour departs et arrivee
   await expect(page.getByText("Paris Gare de Lyon", { exact: true })).toBeVisible();
   await expect(page.getByText("Marseille Saint-Charles", { exact: true })).not.toBeVisible();
 
-  await page.getByRole("tab", { name: "Arrivees" }).click();
+  await page.getByRole("tab", { name: "Arrivées" }).click();
   await expect(page.getByText("Marseille Saint-Charles", { exact: true })).toBeVisible();
-  await expect(page.getByText("Depart Marseille Saint-Charles")).toBeVisible();
+  await expect(page.getByText("Marseille Saint-Charles", { exact: true })).toBeVisible();
   await expect(page.getByText("Paris Gare de Lyon", { exact: true })).not.toBeVisible();
 
-  await page.getByRole("tab", { name: "Departs" }).click();
+  await page.getByRole("tab", { name: "Départs" }).click();
   await expect(page.getByText("Paris Gare de Lyon", { exact: true })).toBeVisible();
   await expect(page.getByText("Marseille Saint-Charles", { exact: true })).not.toBeVisible();
 });
@@ -289,16 +289,16 @@ test("un rechargement navigateur conserve la gare et l'onglet courant", async ({
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
-  await page.getByRole("tab", { name: "Arrivees" }).click();
+  await page.getByRole("tab", { name: "Arrivées" }).click();
   await expect(page.getByText("Marseille Saint-Charles", { exact: true })).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Lyon Part Dieu" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Arrivees" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Arrivées" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText("Marseille Saint-Charles", { exact: true })).toBeVisible();
 });
 
-test("les departs se chargent depuis maintenant moins cinq minutes avec pagination", async ({ page }) => {
+test("les départs se chargent depuis maintenant moins cinq minutes avec pagination", async ({ page }) => {
   const requestedPages: string[] = [];
   const requestedFromDateTimes: Array<string | null> = [];
 
@@ -353,12 +353,12 @@ test("les departs se chargent depuis maintenant moins cinq minutes avec paginati
 
   await page.getByRole("button", { name: "Charger plus" }).click();
   await expect(page.getByText("Destination 22", { exact: true })).toBeVisible();
-  await expect(page.getByText("Tous les resultats disponibles sont affiches.")).toBeVisible();
+  await expect(page.getByText("Tous les résultats disponibles sont affichés.")).toBeVisible();
   expect(requestedPages).toContain("1");
   expect(requestedFromDateTimes[1]).toBe(requestedFromDateTimes[0]);
 });
 
-test("un train peut etre suivi puis actualise sur une page dediee", async ({ page }) => {
+test("un train peut être suivi puis actualisé sur une page dédiée", async ({ page }) => {
   let boardCalls = 0;
 
   await page.route("**/api/stations/search**", async (route) => {
@@ -397,7 +397,7 @@ test("un train peut etre suivi puis actualise sur une page dediee", async ({ pag
                 {
                   id: "delay-1",
                   title: "Retard",
-                  message: "Retard estime a 10 minutes.",
+                  message: "Retard estimé à 10 minutes.",
                 },
               ]
             : [],
@@ -410,15 +410,15 @@ test("un train peut etre suivi puis actualise sur une page dediee", async ({ pag
   await page.getByLabel("Nom de gare").fill("Lyon");
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
 
-  await page.getByRole("button", { name: "Suivre le train 876543" }).click();
+  await page.getByRole("button", { name: "Ouvrir le détail du train 876543" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "TER - Train 876543" })).toBeVisible();
   await expect(page.locator(".tracking-route-cards").getByText("Lyon Part Dieu")).toBeVisible();
-  await expect(page.locator(".tracking-route-cards").getByText("Arrivee")).toBeVisible();
+  await expect(page.locator(".tracking-route-cards").getByText("Arrivée")).toBeVisible();
   await expect(page.locator(".tracking-route-cards").getByText("Paris Gare de Lyon")).toBeVisible();
-  await expect(page.getByText(/Derniere actualisation/)).toBeVisible();
-  await expect(page.getByLabel("Heure de depart")).toContainText("14:08");
+  await expect(page.getByText(/Dernière actualisation/)).toBeVisible();
+  await expect(page.getByLabel("Heure de départ")).toContainText("14:08");
   await expect(page.getByLabel("Voie du train")).toContainText("2");
-  await expect(page.getByLabel("Statut du train")).toContainText("A l'heure");
+  await expect(page.getByLabel("Statut du train")).toContainText("À l'heure");
   await expect(page.getByText("Dijon Ville")).toBeVisible();
   await expect(page.getByRole("region", { name: "Plan voitures et reperes" })).not.toBeVisible();
 
@@ -426,18 +426,18 @@ test("un train peut etre suivi puis actualise sur une page dediee", async ({ pag
   const importantInformation = page.getByRole("region", { name: "Informations importantes du train" });
   await expect(importantInformation).toBeVisible();
   await expect(importantInformation).toContainText("Retard");
-  await expect(importantInformation).toContainText("Retard estime : 10 minutes.");
-  await expect(importantInformation).toContainText("Retard estime a 10 minutes.");
-  await expect(page.getByLabel("Heure de depart")).toContainText("Depart retarde");
-  await expect(page.getByLabel("Heure de depart")).toContainText("14:08");
-  await expect(page.getByLabel("Heure de depart")).toContainText("14:18");
+  await expect(importantInformation).toContainText("Retard estimé : 10 minutes.");
+  await expect(importantInformation).toContainText("Retard estimé à 10 minutes.");
+  await expect(page.getByLabel("Heure de départ")).toContainText("Départ retardé");
+  await expect(page.getByLabel("Heure de départ")).toContainText("14:08");
+  await expect(page.getByLabel("Heure de départ")).toContainText("14:18");
   await expect(page.getByLabel("Voie du train")).toContainText("7");
 
   await page.getByRole("button", { name: "Retour" }).click();
-  await expect(page.getByRole("button", { name: "Suivre le train 876543" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ouvrir le détail du train 876543" })).toBeVisible();
 });
 
-test("une erreur d'actualisation du train suivi reste visible sur la page detail", async ({ page }) => {
+test("une erreur d'actualisation du train suivi reste visible sur la page détail", async ({ page }) => {
   let boardCalls = 0;
 
   await page.route("**/api/stations/search**", async (route) => {
@@ -487,8 +487,8 @@ test("une erreur d'actualisation du train suivi reste visible sur la page detail
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
-  await page.getByRole("button", { name: "Suivre le train 876543" }).click();
-  await expect(page.getByText(/Derniere actualisation/)).toBeVisible();
+  await page.getByRole("button", { name: "Ouvrir le détail du train 876543" }).click();
+  await expect(page.getByText(/Dernière actualisation/)).toBeVisible();
 
   await page.getByRole("button", { name: "Actualiser" }).click();
 
@@ -496,10 +496,10 @@ test("une erreur d'actualisation du train suivi reste visible sur la page detail
   await expect(updateError).toBeVisible();
   await expect(updateError).toContainText("Actualisation impossible");
   await expect(updateError).toContainText("API SNCF indisponible");
-  await expect(updateError).toContainText("Les informations affichees ne sont pas confirmees");
+  await expect(updateError).toContainText("Les informations affichées ne sont pas confirmées");
 });
 
-test("un rechargement navigateur conserve la page detail du train suivi", async ({ page }) => {
+test("un rechargement navigateur conserve la page détail du train suivi", async ({ page }) => {
   await page.route("**/api/stations/search**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -538,17 +538,17 @@ test("un rechargement navigateur conserve la page detail du train suivi", async 
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
-  await page.getByRole("button", { name: "Suivre le train 876543" }).click();
+  await page.getByRole("button", { name: "Ouvrir le détail du train 876543" }).click();
   await expect(page.getByRole("heading", { level: 2, name: "TER - Train 876543" })).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Lyon Part Dieu" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 2, name: "TER - Train 876543" })).toBeVisible();
-  await expect(page.getByLabel("Heure de depart")).toContainText("14:08");
-  await expect(page.getByRole("tab", { name: "Departs" })).not.toBeVisible();
+  await expect(page.getByLabel("Heure de départ")).toContainText("14:08");
+  await expect(page.getByRole("tab", { name: "Départs" })).not.toBeVisible();
 });
 
-test("la page detail n'affiche pas une arrivee identique a la gare selectionnee", async ({ page }) => {
+test("la page détail n'affiche pas une arrivée identique à la gare sélectionnée", async ({ page }) => {
   await page.route("**/api/stations/search**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -586,13 +586,13 @@ test("la page detail n'affiche pas une arrivee identique a la gare selectionnee"
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
-  await page.getByRole("button", { name: "Suivre le train 876543" }).click();
+  await page.getByRole("button", { name: "Ouvrir le détail du train 876543" }).click();
 
   const routeCards = page.locator(".tracking-route-cards");
-  await expect(routeCards.getByText("Depart")).toBeVisible();
+  await expect(routeCards.getByText("Départ")).toBeVisible();
   await expect(routeCards.getByText("Lyon Part Dieu")).toBeVisible();
-  await expect(routeCards.getByText("Arrivee")).toBeVisible();
-  await expect(routeCards.getByText("Non communique")).toBeVisible();
+  await expect(routeCards.getByText("Arrivée")).toBeVisible();
+  await expect(routeCards.getByText("Non communiqué")).toBeVisible();
   await expect(routeCards.getByText("Lyon Part-Dieu (Lyon)")).not.toBeVisible();
 });
 
@@ -620,7 +620,7 @@ test("un libelle de trajet sert au trajet mais pas au nom du train", async ({ pa
         {
           id: "departure-route-label",
           time: "2026-06-20T14:08:00+02:00",
-          destination: "Non communique",
+          destination: "Non communiqué",
           routeLabel: "Frankfurt am Main Hbf - Paris Est",
           trainNumber: "9560",
           platform: "2",
@@ -634,7 +634,7 @@ test("un libelle de trajet sert au trajet mais pas au nom du train", async ({ pa
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Frankfurt");
   await page.getByRole("button", { name: /frankfurt am main hbf/i }).click();
-  await page.getByRole("button", { name: "Suivre le train 9560" }).click();
+  await page.getByRole("button", { name: "Ouvrir le détail du train 9560" }).click();
 
   const routeCards = page.locator(".tracking-route-cards");
   await expect(routeCards.getByText("Frankfurt am Main Hbf")).toBeVisible();
@@ -686,8 +686,8 @@ test("le menu fixe reste stable au scroll avec la barre d'actions", async ({ pag
 
   await page.mouse.wheel(0, 900);
   await expect(page.getByRole("button", { name: "Actualiser" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Departs" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Arrivees" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Départs" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Arrivées" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Alertes" })).toBeVisible();
   await expect(page.getByText("Lyon Part Dieu").first()).toBeVisible();
 

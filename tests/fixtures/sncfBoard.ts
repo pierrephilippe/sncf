@@ -19,7 +19,7 @@ export const delayedDepartureFixture: BoardResponse = {
     {
       id: "delay-1",
       severity: { name: "Retard", effect: "SIGNIFICANT_DELAYS" },
-      messages: [{ text: "Retard estime a 10 minutes." }],
+      messages: [{ text: "Retard estimé à 10 minutes." }],
     },
   ],
 };

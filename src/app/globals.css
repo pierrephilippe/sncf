@@ -213,9 +213,11 @@ h2 {
 }
 
 .board-item {
-  border-top: 2px solid var(--border);
-  border-radius: 0;
-  background: transparent;
+  background: #050505;
+}
+
+.board-item:nth-child(even) {
+  background: var(--surface);
 }
 
 .announcement {
@@ -450,6 +452,10 @@ input {
   gap: 0.65rem;
 }
 
+.board-list {
+  gap: 0;
+}
+
 .load-more {
   display: grid;
   margin-top: 1rem;
@@ -465,9 +471,41 @@ input {
   padding: 0.9rem 0;
 }
 
-.train-follow-button {
-  margin-top: 0.75rem;
+.board-item {
+  padding: 0;
+  border-radius: 0;
+}
+
+.board-card-button {
+  appearance: none;
+  display: block;
   width: 100%;
+  min-height: 5.5rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  padding: 0.25rem 0.2rem;
+  text-align: left;
+}
+
+.board-card-button:hover,
+.board-card-button:focus-visible {
+  background: color-mix(in srgb, var(--surface-strong) 86%, var(--text) 14%);
+}
+
+.board-card-button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 4px;
+}
+
+.board-card-button .muted {
+  color: var(--muted);
+}
+
+.board-disruption {
+  width: 100%;
+  margin-bottom: 0;
 }
 
 .announcement {

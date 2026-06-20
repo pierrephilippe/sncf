@@ -3,7 +3,6 @@
 import {
   AlertTriangle,
   ArrowLeft,
-  Bell,
   CheckCircle2,
   Clock3,
   Info,
@@ -52,7 +51,7 @@ const NAVIGATION_STORAGE_KEY = "sncf-accessibilite:navigation";
 const searchModeLabel: Record<SearchMode, string> = {
   text: "Recherche par saisie",
   nearby: "Recherche autour",
-  favorites: "Selection de favoris",
+  favorites: "Sélection de favoris",
 };
 
 const formatTime = (isoDate: string): string =>
@@ -63,16 +62,16 @@ const formatTime = (isoDate: string): string =>
   }).format(new Date(isoDate));
 
 const statusLabel: Record<BoardItem["status"], string> = {
-  on_time: "A l'heure",
+  on_time: "À l'heure",
   delayed: "Retard",
-  cancelled: "Supprime",
-  disrupted: "Perturbe",
+  cancelled: "Supprimé",
+  disrupted: "Perturbé",
   unknown: "Non confirme",
 };
 
 const priorityLabel: Record<Announcement["priority"], string> = {
   critical: "Priorite haute",
-  warning: "A surveiller",
+  warning: "À surveiller",
   info: "Information",
 };
 
@@ -288,9 +287,9 @@ export function AccessibleStationApp() {
       setError("");
       try {
         setSuggestions(await searchStations(query));
-        setStatus("Suggestions mises a jour.");
+        setStatus("Suggestions mises à jour.");
       } catch (cause) {
-        setError(readableError(cause, "Recherche indisponible. Reessayez dans quelques instants."));
+        setError(readableError(cause, "Recherche indisponible. Réessayez dans quelques instants."));
         setStatus("");
       }
     }, 250);
@@ -337,7 +336,7 @@ export function AccessibleStationApp() {
             }
           : currentTrackedTrain);
       } catch (cause) {
-        setError(readableError(cause, "Detail du train indisponible. Les informations affichees restent celles du tableau."));
+        setError(readableError(cause, "Détail du train indisponible. Les informations affichées restent celles du tableau."));
         setStatus("");
       }
     };
@@ -347,7 +346,7 @@ export function AccessibleStationApp() {
 
   const refresh = async () => {
     if (!selectedStation) return;
-    setStatus("Mise a jour des informations voyageurs.");
+    setStatus("Mise à jour des informations voyageurs.");
     setError("");
 
     try {
@@ -385,9 +384,9 @@ export function AccessibleStationApp() {
         [activeTab]: true,
       }));
       const refreshedAt = new Date().toISOString();
-      setStatus(`Derniere mise à jour : ${formatTime(refreshedAt)}`);
+      setStatus(`Dernière mise à jour : ${formatTime(refreshedAt)}`);
     } catch (cause) {
-      setError(readableError(cause, "Informations indisponibles. Reessayez dans quelques instants."));
+      setError(readableError(cause, "Informations indisponibles. Réessayez dans quelques instants."));
       setStatus("");
     }
   };
@@ -444,7 +443,7 @@ export function AccessibleStationApp() {
         }));
       }
     } catch (cause) {
-      setError(readableError(cause, "Chargement des informations suivantes indisponible. Reessayez dans quelques instants."));
+      setError(readableError(cause, "Chargement des informations suivantes indisponible. Réessayez dans quelques instants."));
       setPaging((state) => ({
         ...state,
         [activeTab]: {
@@ -457,7 +456,7 @@ export function AccessibleStationApp() {
 
   const findNearby = () => {
     if (!navigator.geolocation) {
-      setError("La geolocalisation n'est pas disponible sur cet appareil.");
+      setError("La géolocalisation n'est pas disponible sur cet appareil.");
       return;
     }
 
@@ -468,14 +467,14 @@ export function AccessibleStationApp() {
         try {
           const stations = await nearbyStations(position.coords.latitude, position.coords.longitude);
           setSuggestions(stations);
-          setStatus(stations.length ? "Gares proches trouvees." : "Aucune gare proche trouvee.");
+          setStatus(stations.length ? "Gares proches trouvées." : "Aucune gare proche trouvée.");
         } catch (cause) {
-          setError(readableError(cause, "Recherche autour de vous indisponible. Reessayez dans quelques instants."));
+          setError(readableError(cause, "Recherche autour de vous indisponible. Réessayez dans quelques instants."));
           setStatus("");
         }
       },
       () => {
-        setError("Autorisation de geolocalisation refusee ou position indisponible.");
+        setError("Autorisation de géolocalisation refusée ou position indisponible.");
         setStatus("");
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
@@ -518,14 +517,14 @@ export function AccessibleStationApp() {
       item,
       updatedAt: new Date().toISOString(),
     });
-    setStatus(`Suivi du train ${item.trainNumber ?? "selectionne"} active.`);
+    setStatus(`Suivi du train ${item.trainNumber ?? "sélectionné"} activé.`);
     setError("");
   };
 
   const refreshTrackedTrain = async () => {
     if (!trackedTrain) return;
 
-    setStatus("Mise a jour du suivi du train.");
+    setStatus("Mise à jour du suivi du train.");
     setError("");
 
     try {
@@ -543,7 +542,7 @@ export function AccessibleStationApp() {
       const refreshedAt = new Date().toISOString();
       if (!refreshedItem) {
         setTrackedTrain({ ...trackedTrain, updatedAt: refreshedAt });
-        setStatus("Train non retrouve dans les prochaines informations. Il peut etre parti, arrive ou ne plus etre affiche.");
+        setStatus("Train non retrouvé dans les prochaines informations. Il peut être parti, arrivé ou ne plus être affiché.");
         return;
       }
 
@@ -556,9 +555,9 @@ export function AccessibleStationApp() {
         item: enrichedItem,
         updatedAt: refreshedAt,
       });
-      setStatus(`Derniere mise à jour : ${formatTime(refreshedAt)}`);
+      setStatus(`Dernière mise à jour : ${formatTime(refreshedAt)}`);
     } catch (cause) {
-      setError(readableError(cause, "Suivi du train indisponible. Reessayez dans quelques instants."));
+      setError(readableError(cause, "Suivi du train indisponible. Réessayez dans quelques instants."));
       setStatus("");
     }
   };
@@ -587,7 +586,7 @@ export function AccessibleStationApp() {
               <button
                 className="icon-button compact-button"
                 type="button"
-                aria-label="Supprimer la gare selectionnee"
+                aria-label="Supprimer la gare sélectionnée"
                 onClick={clearStationSelection}
               >
                 <span className="button-content">
@@ -597,7 +596,7 @@ export function AccessibleStationApp() {
               </button>
             </div>
           ) : (
-            <div className="search-mode-tabs" role="tablist" aria-label="Methode de recherche">
+            <div className="search-mode-tabs" role="tablist" aria-label="Méthode de recherche">
               {(["text", "nearby", "favorites"] as const).map((mode) => (
                 <button
                   key={mode}
@@ -636,7 +635,7 @@ export function AccessibleStationApp() {
                 aria-selected={activeTab === "departures"}
                 onClick={() => setActiveTab("departures")}
               >
-                Departs
+                Départs
               </button>
               <button
                 className="tab"
@@ -645,7 +644,7 @@ export function AccessibleStationApp() {
                 aria-selected={activeTab === "arrivals"}
                 onClick={() => setActiveTab("arrivals")}
               >
-                Arrivees
+                Arrivées
               </button>
               <button
                 className="tab"
@@ -671,7 +670,7 @@ export function AccessibleStationApp() {
           <ApiErrorAlert
             title="Service indisponible"
             message={error}
-            detail="Aucune nouvelle information n'a pu etre recuperee. Reessayez dans quelques instants."
+            detail="Aucune nouvelle information n'a pu être récupérée. Réessayez dans quelques instants."
           />
         </div>
       )}
@@ -741,7 +740,7 @@ export function AccessibleStationApp() {
                     <button className="suggestion-button" type="button" onClick={() => selectStation(station)}>
                       <strong>{station.name}</strong>
                       {station.distanceMeters ? (
-                        <span className="muted"> - {Math.round(station.distanceMeters)} metres</span>
+                        <span className="muted"> - {Math.round(station.distanceMeters)} mètres</span>
                       ) : null}
                     </button>
                   </li>
@@ -782,7 +781,7 @@ export function AccessibleStationApp() {
                   {paging[activeTab].isLoadingMore ? "Chargement en cours" : "Charger plus"}
                 </button>
               ) : (
-                <p className="muted">Tous les resultats disponibles sont affiches.</p>
+                <p className="muted">Tous les résultats disponibles sont affichés.</p>
               )}
             </div>
           )}
@@ -801,54 +800,45 @@ function BoardList({
   type: BoardType;
   onFollow: (item: BoardItem, type: BoardType) => void;
 }) {
-  if (items.length === 0) return <p className="muted">Aucune information a afficher pour le moment.</p>;
+  if (items.length === 0) return <p className="muted">Aucune information à afficher pour le moment.</p>;
 
   return (
-    <ul className="board-list" aria-label={type === "departures" ? "Tableau des departs" : "Tableau des arrivees"}>
+    <ul className="board-list" aria-label={type === "departures" ? "Tableau des départs" : "Tableau des arrivées"}>
       {items.map((item, index) => (
         <li className="board-item" key={`${type}-${item.id}-${index}`}>
-          <div className="board-topline">
-            <div>
-              <p className="destination">
-                {type === "arrivals"
-                  ? item.origin ?? "Gare de depart non communiquee"
-                  : item.destination ?? "Destination non communiquee"}
-              </p>
-              <p className="muted">{item.line ?? "Ligne non communiquee"}</p>
-            </div>
-            <time className="time" dateTime={item.expectedTime ?? item.time}>
-              {formatTime(item.expectedTime ?? item.time)}
-            </time>
-          </div>
-          <div className="meta">
-            <span className="tag">
-              {type === "arrivals"
-                ? `Depart ${item.origin ?? "non communique"}`
-                : `Destination ${item.destination ?? "non communiquee"}`}
-            </span>
-            {item.trainNumber && <span className="tag">Train {item.trainNumber}</span>}
-            <span className="tag">Voie {item.platform ?? "non communiquee"}</span>
-            <span className={`tag ${item.status === "cancelled" ? "danger" : item.status === "delayed" || item.status === "disrupted" ? "warning" : ""}`}>
-              <span className="tag-content">
-                <StatusIcon status={item.status} />
-                <span>{statusLabel[item.status]}</span>
-              </span>
-            </span>
-          </div>
-          {item.disruptions.map((disruption, index) => (
-            <p className="muted" key={`${disruption.id}-${index}`}>
-              {disruption.title}
-            </p>
-          ))}
           <button
-            className="button-secondary train-follow-button"
+            className="board-card-button"
             type="button"
+            aria-label={item.trainNumber ? `Ouvrir le détail du train ${item.trainNumber}` : "Ouvrir le détail du train"}
             onClick={() => onFollow(item, type)}
           >
-            <span className="button-content">
-              <Bell aria-hidden="true" />
-              <span>{item.trainNumber ? `Suivre le train ${item.trainNumber}` : "Suivre ce train"}</span>
-            </span>
+            <div className="board-topline">
+              <div>
+                <p className="destination">
+                  {type === "arrivals"
+                    ? item.origin ?? "Gare de départ non communiquée"
+                    : item.destination ?? "Destination non communiquée"}
+                </p>
+                <p className="muted">{item.line ?? "Ligne non communiquée"}</p>
+              </div>
+              <time className="time" dateTime={item.expectedTime ?? item.time}>
+                {formatTime(item.expectedTime ?? item.time)}
+              </time>
+            </div>
+            <div className="meta">
+              <span className="tag">Voie {item.platform ?? "non communiquée"}</span>
+              <span className={`tag ${item.status === "cancelled" ? "danger" : item.status === "delayed" || item.status === "disrupted" ? "warning" : ""}`}>
+                <span className="tag-content">
+                  <StatusIcon status={item.status} />
+                  <span>{statusLabel[item.status]}</span>
+                </span>
+              </span>
+            </div>
+            {item.disruptions.map((disruption, index) => (
+              <p className="muted board-disruption" key={`${disruption.id}-${index}`}>
+                {disruption.title}
+              </p>
+            ))}
           </button>
         </li>
       ))}
@@ -912,7 +902,7 @@ function TrainTrackingView({
       {error && (
         <ApiErrorAlert
           message={error}
-          detail="Les informations affichees ne sont pas confirmees par une nouvelle mise a jour."
+          detail="Les informations affichées ne sont pas confirmées par une nouvelle mise à jour."
         />
       )}
 
@@ -922,22 +912,22 @@ function TrainTrackingView({
         </div>
         <div className="tracking-route-cards" aria-labelledby="train-tracking-title">
           <div className="tracking-route-card">
-            <span>Depart</span>
-            <strong id="train-tracking-title">{departurePlace ?? "Non communique"}</strong>
+            <span>Départ</span>
+            <strong id="train-tracking-title">{departurePlace ?? "Non communiqué"}</strong>
           </div>
           <div className="tracking-route-card">
-            <span>Arrivee</span>
-            <strong>{arrivalPlace ?? "Non communique"}</strong>
+            <span>Arrivée</span>
+            <strong>{arrivalPlace ?? "Non communiqué"}</strong>
           </div>
         </div>
       </header>
 
       <div className="tracking-summary-cards">
-        <div className="tracking-summary-card" aria-label={type === "arrivals" ? "Heure d'arrivee" : "Heure de depart"}>
+        <div className="tracking-summary-card" aria-label={type === "arrivals" ? "Heure d'arrivée" : "Heure de départ"}>
           <span>
             {type === "arrivals"
-              ? hasRealtimeTime ? "Arrivee retardee" : "Arrivee"
-              : hasRealtimeTime ? "Depart retarde" : "Depart"}
+              ? hasRealtimeTime ? "Arrivée retardée" : "Arrivée"
+              : hasRealtimeTime ? "Départ retardé" : "Départ"}
           </span>
           {hasRealtimeTime && (
             <time className="original-time" dateTime={item.time}>{formatTime(item.time)}</time>
@@ -963,10 +953,10 @@ function TrainTrackingView({
             <StatusIcon status={item.status} />
             <span>{statusLabel[item.status]}</span>
           </p>
-          {delay !== null && <p>Retard estime : {delay} minutes.</p>}
-          {item.status === "cancelled" && <p>Ce train est indique comme supprime.</p>}
+          {delay !== null && <p>Retard estimé : {delay} minutes.</p>}
+          {item.status === "cancelled" && <p>Ce train est indiqué comme supprimé.</p>}
           {item.status === "disrupted" && item.disruptions.length === 0 && (
-            <p>Une perturbation est indiquee pour ce train.</p>
+            <p>Une perturbation est indiquée pour ce train.</p>
           )}
           {item.disruptions.map((disruption, index) => (
             <p key={`${disruption.id}-alert-${index}`}>
@@ -978,7 +968,7 @@ function TrainTrackingView({
       )}
 
       <p className="tracking-updated-at">
-        Derniere actualisation : <time dateTime={updatedAt}>{formatTime(updatedAt)}</time>
+        Dernière actualisation : <time dateTime={updatedAt}>{formatTime(updatedAt)}</time>
       </p>
 
       {type === "departures" && item.servedStations && item.servedStations.length > 0 && (
