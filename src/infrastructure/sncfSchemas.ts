@@ -16,6 +16,7 @@ const stopPointSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
   label: z.string().optional(),
+  platform_code: z.string().optional(),
 });
 
 const placeSchema = z.object({
@@ -84,6 +85,7 @@ const stopDateTimeSchema = z.object({
 const boardEntrySchema = z.object({
   display_informations: displayInformationSchema.optional(),
   stop_date_time: stopDateTimeSchema,
+  stop_point: stopPointSchema.optional(),
   route: z
     .object({
       name: z.string().optional(),

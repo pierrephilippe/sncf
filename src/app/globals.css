@@ -411,8 +411,60 @@ a.button-secondary {
   color: var(--muted);
 }
 
+.loading-status {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.content-loading {
+  display: inline-flex;
+  min-height: 5.5rem;
+  gap: 0.55rem;
+  align-items: center;
+  color: var(--text);
+  font-weight: 800;
+}
+
+.loading-spinner {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid color-mix(in srgb, var(--border) 45%, transparent);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: none;
+    border-style: double;
+  }
+}
+
 .refresh-button {
   white-space: nowrap;
+}
+
+.tracking-status-button {
+  width: 100%;
+  justify-content: center;
+  background: var(--surface-strong);
+}
+
+.tracking-status-button.update-available {
+  border-color: var(--warning);
+  border-style: dashed;
+  color: var(--warning);
 }
 
 .sr-only {
@@ -533,15 +585,51 @@ a.button-secondary {
   align-items: flex-start;
 }
 
+.board-topline > div {
+  min-width: 0;
+}
+
+.board-time {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 0.1rem;
+  align-items: flex-end;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
 .time {
   font-size: 1.3rem;
   font-weight: 800;
   color: var(--brand);
 }
 
+.initial-time {
+  display: inline-flex;
+  gap: 0.3rem;
+  align-items: baseline;
+  color: var(--muted);
+}
+
+.initial-time-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.board-time .original-time {
+  color: color-mix(in srgb, var(--brand) 78%, var(--muted) 22%);
+  font-size: 1.05rem;
+}
+
+.board-time .updated-time {
+  color: var(--brand-strong);
+}
+
 .destination {
   font-weight: 800;
   font-size: 1.1rem;
+  overflow-wrap: anywhere;
 }
 
 .meta {
@@ -650,8 +738,18 @@ a.button-secondary {
 .tracking-summary-card .original-time {
   color: var(--muted);
   font-size: 0.95rem;
-  text-decoration: line-through;
-  text-decoration-thickness: 0.14em;
+  display: inline;
+}
+
+.tracking-summary-card .initial-time {
+  display: flex;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.tracking-summary-card .initial-time-label {
+  display: inline;
+  font-size: 0.75rem;
 }
 
 .status-summary {
@@ -671,6 +769,15 @@ a.button-secondary {
   background: var(--surface-strong);
 }
 
+.tracking-update-hint {
+  display: grid;
+  gap: 0.35rem;
+  border: 2px solid var(--warning);
+  border-radius: 6px;
+  padding: 0.7rem;
+  background: var(--surface-strong);
+}
+
 .page-alert {
   padding: 0 1rem 0.85rem;
 }
@@ -685,6 +792,10 @@ a.button-secondary {
 }
 
 .tracking-alert p {
+  margin: 0;
+}
+
+.tracking-update-hint p {
   margin: 0;
 }
 

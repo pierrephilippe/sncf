@@ -51,7 +51,8 @@ export class SncfStationRepository implements StationRepository {
 
 export class SncfBoardRepository implements BoardRepository {
   private static readonly REALTIME_LOOKBACK_MINUTES = 180;
-  private static readonly MAX_FILTERED_PAGES = 8;
+  private static readonly FILTERED_SOURCE_COUNT = 100;
+  private static readonly LOOKBACK_SOURCE_COUNT = 500;
 
   constructor(
     private readonly client: SncfHttpClient,
@@ -88,37 +89,46 @@ export class SncfBoardRepository implements BoardRepository {
     const requestedCount = query.count ?? 20;
     const requestedPage = query.page ?? 0;
     const requestedOffset = requestedPage * requestedCount;
+    const sourceCount = Math.max(
+      requestedCount,
+      SncfBoardRepository.FILTERED_SOURCE_COUNT,
+      requestedOffset + requestedCount,
+    );
     const threshold = query.fromDateTime ?? new Date().toISOString();
     const externalFromDateTime = subtractMinutes(threshold, SncfBoardRepository.REALTIME_LOOKBACK_MINUTES);
-    const responses: BoardResponse[] = [];
 
-    for (let page = 0; page < SncfBoardRepository.MAX_FILTERED_PAGES; page += 1) {
-      const response = await this.client.get<BoardResponse>(
+    const [currentResponse, lookbackResponse] = await Promise.all([
+      this.client.get<BoardResponse>(
         `/coverage/sncf/stop_areas/${encodeURIComponent(stationId)}/${type}`,
         {
-          count: requestedCount,
-          start_page: page,
+          count: sourceCount,
+          start_page: 0,
+          from_datetime: toSncfDateTime(threshold),
+          depth: 3,
+          data_freshness: "realtime",
+        },
+      ),
+      this.client.get<BoardResponse>(
+        `/coverage/sncf/stop_areas/${encodeURIComponent(stationId)}/${type}`,
+        {
+          count: SncfBoardRepository.LOOKBACK_SOURCE_COUNT,
+          start_page: 0,
           from_datetime: toSncfDateTime(externalFromDateTime),
           depth: 3,
           data_freshness: "realtime",
         },
-      );
-      if (!response.ok) throw response.error;
+      ),
+    ]);
+    if (!currentResponse.ok) throw currentResponse.error;
+    if (!lookbackResponse.ok) throw lookbackResponse.error;
 
-      const parsedResponse = boardResponseSchema.parse(response.value);
-      responses.push(parsedResponse);
-
-      const mergedResponse = mergeBoardResponses(responses);
-      const mappedBoard = this.adapter.fromBoard(mergedResponse, type);
-      const relevantItems = filterBoardFromDateTime(mappedBoard, threshold);
-      const entries = type === "departures" ? parsedResponse.departures ?? [] : parsedResponse.arrivals ?? [];
-
-      if (relevantItems.length >= requestedOffset + requestedCount || entries.length < requestedCount) {
-        return this.resolveFilteredPage(mappedBoard, mergedResponse, type, threshold, requestedOffset, requestedCount);
-      }
-    }
-
-    const mergedResponse = mergeBoardResponses(responses);
+    const currentParsedResponse = boardResponseSchema.parse(currentResponse.value);
+    const delayedLookbackResponse = filterDelayedLookbackResponse(
+      boardResponseSchema.parse(lookbackResponse.value),
+      type,
+      threshold,
+    );
+    const mergedResponse = mergeBoardResponses([delayedLookbackResponse, currentParsedResponse]);
     return this.resolveFilteredPage(
       this.adapter.fromBoard(mergedResponse, type),
       mergedResponse,
@@ -140,6 +150,11 @@ export class SncfBoardRepository implements BoardRepository {
     const relevantPairs = board
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => isBoardItemVisibleFrom(item, threshold))
+      .filter(uniqueBoardItemPair())
+      .sort((left, right) => {
+        const timeDiff = new Date(plannedBoardTime(left.item)).getTime() - new Date(plannedBoardTime(right.item)).getTime();
+        return timeDiff || left.index - right.index;
+      })
       .slice(offset, offset + count);
     const pageBoard = relevantPairs.map(({ item }) => item);
     const pageResponse = sliceBoardResponse(response, type, relevantPairs.map(({ index }) => index));
@@ -249,19 +264,58 @@ const toSncfDateTime = (isoDate: string): string => {
 const subtractMinutes = (isoDate: string, minutes: number): string =>
   new Date(new Date(isoDate).getTime() - minutes * 60 * 1000).toISOString();
 
+const plannedBoardTime = (item: BoardItem): string => item.time;
+
 const effectiveBoardTime = (item: BoardItem): string => item.expectedTime ?? item.time;
-
-const filterBoardFromDateTime = (items: BoardItem[], fromDateTime: string): BoardItem[] => {
-  const threshold = new Date(fromDateTime).getTime();
-  if (Number.isNaN(threshold)) return items;
-
-  return items.filter((item) => isBoardItemVisibleFrom(item, fromDateTime));
-};
 
 const isBoardItemVisibleFrom = (item: BoardItem, fromDateTime: string): boolean => {
   const threshold = new Date(fromDateTime).getTime();
   if (Number.isNaN(threshold)) return true;
   return new Date(effectiveBoardTime(item)).getTime() >= threshold;
+};
+
+const uniqueBoardItemPair = () => {
+  const seen = new Set<string>();
+
+  return ({ item }: { item: BoardItem }): boolean => {
+    const key = [
+      item.vehicleJourneyId,
+      item.trainNumber,
+      item.time,
+      item.expectedTime,
+      item.destination,
+      item.origin,
+    ].filter(Boolean).join("|") || item.id;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  };
+};
+
+const filterDelayedLookbackResponse = (
+  response: BoardResponse,
+  type: BoardType,
+  threshold: string,
+): BoardResponse => {
+  const thresholdSncfDateTime = toSncfDateTime(threshold);
+  const isDelayedAcrossThreshold = (entry: NonNullable<BoardResponse["departures"]>[number]): boolean => {
+    const stopDate = entry.stop_date_time;
+    const baseTime = type === "departures" ? stopDate.base_departure_date_time : stopDate.base_arrival_date_time;
+    const realtimeTime = type === "departures" ? stopDate.departure_date_time : stopDate.arrival_date_time;
+    return Boolean(baseTime && realtimeTime && baseTime < thresholdSncfDateTime && realtimeTime >= thresholdSncfDateTime);
+  };
+
+  if (type === "departures") {
+    return {
+      departures: (response.departures ?? []).filter(isDelayedAcrossThreshold),
+      disruptions: response.disruptions,
+    };
+  }
+
+  return {
+    arrivals: (response.arrivals ?? []).filter(isDelayedAcrossThreshold),
+    disruptions: response.disruptions,
+  };
 };
 
 const mergeBoardResponses = (responses: BoardResponse[]): BoardResponse => ({

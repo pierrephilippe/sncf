@@ -241,6 +241,32 @@ describe("SncfBoardAdapter", () => {
     expect(item.vehicleJourneyId).toBe("vehicle_journey:SNCF:9560");
   });
 
+  it("extrait la voie depuis le platform_code du stop_point quand l'API le fournit", () => {
+    const [item] = new SncfBoardAdapter().fromBoard(
+      {
+        departures: [
+          {
+            display_informations: {
+              code: "9560",
+              direction: "Paris Est",
+            },
+            stop_date_time: {
+              base_departure_date_time: "20260620T140800",
+              departure_date_time: "20260620T140800",
+            },
+            stop_point: {
+              name: "Nancy",
+              platform_code: "4",
+            },
+          },
+        ],
+      },
+      "departures",
+    );
+
+    expect(item.platform).toBe("4");
+  });
+
   it("extrait les gares desservies depuis le detail vehicle_journey", () => {
     const details = new SncfBoardAdapter().fromVehicleJourney({
       vehicle_journeys: [

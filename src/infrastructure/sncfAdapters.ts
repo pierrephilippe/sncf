@@ -84,7 +84,7 @@ export class SncfBoardAdapter {
         line: compact(display?.commercial_mode) ?? compact(display?.physical_mode),
         routeLabel,
         trainNumber: trainNumberFromDisplay(display?.code, display?.headsign),
-        platform: undefined,
+        platform: compact(entry.stop_point?.platform_code),
         status: inferStatus(baseTime, realtimeTime, linkedDisruptions),
         disruptions: linkedDisruptions,
       };

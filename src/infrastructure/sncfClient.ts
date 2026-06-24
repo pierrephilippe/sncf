@@ -35,7 +35,7 @@ export class FetchSncfHttpClient implements SncfHttpClient {
           Accept: "application/json",
         },
         signal: controller.signal,
-        next: { revalidate: 30 },
+        cache: "no-store",
       });
 
       if (!response.ok) {

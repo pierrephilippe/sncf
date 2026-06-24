@@ -16,7 +16,7 @@ import {
   Volume2,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Announcement, BoardItem, BoardType, Station } from "@/domain/types";
 import { nearbyStations, searchStations, stationAnnouncements, stationBoard, trainDetails } from "./apiClient";
 import { useFavorites } from "./useFavorites";
@@ -44,9 +44,11 @@ type NavigationState = {
   searchMode: SearchMode;
   query: string;
   trackedTrain: TrackedTrain | null;
+  isTrainDetailsOpen: boolean;
 };
 
 const PAGE_SIZE = 20;
+const TRACKED_TRAIN_POLL_INTERVAL_MS = 60_000;
 const NAVIGATION_STORAGE_KEY = "sncf-accessibilite:navigation";
 const OFFICIAL_SNCF_GARES_URL = "https://www.garesetconnexions.sncf/fr/gares-services/";
 
@@ -128,7 +130,7 @@ const delayMinutes = (item: BoardItem): number | null => {
   return delay > 0 ? delay : null;
 };
 
-const initialBoardDateTime = (): string => new Date(Date.now() - 5 * 60 * 1000).toISOString();
+const initialBoardDateTime = (): string => new Date().toISOString();
 
 const mergeById = <T extends { id: string }>(current: T[], next: T[]): T[] => {
   const knownIds = new Set(current.map((item) => item.id));
@@ -140,6 +142,31 @@ const mergeTrainDetails = (item: BoardItem, details: Partial<BoardItem>): BoardI
   ...(details.servedStations && details.servedStations.length > 0 ? { servedStations: details.servedStations } : {}),
   ...(details.routeLabel ? { routeLabel: details.routeLabel } : {}),
 });
+
+const boardItemUpdateSignature = (item: BoardItem): string => JSON.stringify({
+  id: item.id,
+  vehicleJourneyId: item.vehicleJourneyId,
+  time: item.time,
+  expectedTime: item.expectedTime,
+  destination: item.destination,
+  origin: item.origin,
+  servedStations: item.servedStations ?? [],
+  coachPositions: item.coachPositions ?? [],
+  line: item.line,
+  routeLabel: item.routeLabel,
+  trainNumber: item.trainNumber,
+  platform: item.platform,
+  status: item.status,
+  disruptions: item.disruptions.map((disruption) => ({
+    id: disruption.id,
+    title: disruption.title,
+    message: disruption.message,
+    severity: disruption.severity,
+  })),
+});
+
+const hasTrackedTrainChanged = (currentItem: BoardItem, nextItem: BoardItem): boolean =>
+  boardItemUpdateSignature(currentItem) !== boardItemUpdateSignature(nextItem);
 
 const normalizeStationName = (value: string | undefined): string =>
   value
@@ -228,6 +255,7 @@ const readNavigationState = (): NavigationState | null => {
       searchMode: isSearchMode(parsed.searchMode) ? parsed.searchMode : "text",
       query: typeof parsed.query === "string" ? parsed.query : selectedStation?.name ?? "",
       trackedTrain,
+      isTrainDetailsOpen: Boolean(trackedTrain && parsed.isTrainDetailsOpen !== false),
     };
   } catch {
     window.localStorage.removeItem(NAVIGATION_STORAGE_KEY);
@@ -252,11 +280,21 @@ export function AccessibleStationApp() {
   const [paging, setPaging] = useState<PagingState>(() => emptyPagingState());
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
+  const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [searchMode, setSearchMode] = useState<SearchMode>("text");
   const [trackedTrain, setTrackedTrain] = useState<TrackedTrain | null>(null);
+  const [isTrainDetailsOpen, setIsTrainDetailsOpen] = useState(false);
+  const [trackedTrainUpdateAvailable, setTrackedTrainUpdateAvailable] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const attemptedTrainDetailsRef = useRef<Set<string>>(new Set());
   const { favorites, addFavorite, removeFavorite, isFavorite } = useFavorites();
+  const isLoading = pendingRequestCount > 0;
+  const startLoading = useCallback(() => {
+    setPendingRequestCount((count) => count + 1);
+  }, []);
+  const stopLoading = useCallback(() => {
+    setPendingRequestCount((count) => Math.max(0, count - 1));
+  }, []);
 
   useEffect(() => {
     if (hasRestoredNavigation) return;
@@ -267,6 +305,7 @@ export function AccessibleStationApp() {
       setActiveTab(restoredNavigation.activeTab);
       setSearchMode(restoredNavigation.searchMode);
       setTrackedTrain(restoredNavigation.trackedTrain);
+      setIsTrainDetailsOpen(restoredNavigation.isTrainDetailsOpen);
     }
     setHasRestoredNavigation(true);
   }, [hasRestoredNavigation]);
@@ -279,8 +318,9 @@ export function AccessibleStationApp() {
       searchMode,
       query,
       trackedTrain,
+      isTrainDetailsOpen,
     });
-  }, [hasRestoredNavigation, selectedStation, activeTab, searchMode, query, trackedTrain]);
+  }, [hasRestoredNavigation, selectedStation, activeTab, searchMode, query, trackedTrain, isTrainDetailsOpen]);
 
   useEffect(() => {
     if (searchMode !== "text") {
@@ -299,6 +339,7 @@ export function AccessibleStationApp() {
     }
 
     const timeout = window.setTimeout(async () => {
+      startLoading();
       setStatus("Recherche des gares en cours.");
       setError("");
       try {
@@ -307,11 +348,13 @@ export function AccessibleStationApp() {
       } catch (cause) {
         setError(readableError(cause, "Recherche indisponible. Réessayez dans quelques instants."));
         setStatus("");
+      } finally {
+        stopLoading();
       }
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [query, selectedStation, searchMode]);
+  }, [query, selectedStation, searchMode, startLoading, stopLoading]);
 
   useEffect(() => {
     if (!selectedStation) return;
@@ -321,7 +364,7 @@ export function AccessibleStationApp() {
   }, [selectedStation, activeTab, loadedTabs]);
 
   useEffect(() => {
-    if (!selectedStation || trackedTrain) return;
+    if (!selectedStation || isTrainDetailsOpen) return;
     const target = loadMoreRef.current;
     if (!target) return;
 
@@ -334,7 +377,7 @@ export function AccessibleStationApp() {
     observer.observe(target);
     return () => observer.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStation, trackedTrain, activeTab, paging]);
+  }, [selectedStation, isTrainDetailsOpen, activeTab, paging]);
 
   useEffect(() => {
     const vehicleJourneyId = trackedTrain?.item.vehicleJourneyId;
@@ -343,6 +386,7 @@ export function AccessibleStationApp() {
     attemptedTrainDetailsRef.current.add(vehicleJourneyId);
 
     const enrichTrackedTrain = async () => {
+      startLoading();
       try {
         const details = await trainDetails(vehicleJourneyId);
         setTrackedTrain((currentTrackedTrain) => currentTrackedTrain?.item.vehicleJourneyId === vehicleJourneyId
@@ -354,14 +398,17 @@ export function AccessibleStationApp() {
       } catch (cause) {
         setError(readableError(cause, "Détail du train indisponible. Les informations affichées restent celles du tableau."));
         setStatus("");
+      } finally {
+        stopLoading();
       }
     };
 
     void enrichTrackedTrain();
-  }, [trackedTrain?.item.vehicleJourneyId]);
+  }, [trackedTrain?.item.vehicleJourneyId, startLoading, stopLoading]);
 
   const refresh = async () => {
     if (!selectedStation) return;
+    startLoading();
     setStatus("Mise à jour des informations voyageurs.");
     setError("");
 
@@ -404,11 +451,13 @@ export function AccessibleStationApp() {
     } catch (cause) {
       setError(readableError(cause, "Informations indisponibles. Réessayez dans quelques instants."));
       setStatus("");
+    } finally {
+      stopLoading();
     }
   };
 
   const loadMore = async () => {
-    if (!selectedStation || trackedTrain) return;
+    if (!selectedStation || isTrainDetailsOpen) return;
 
     const currentPaging = paging[activeTab];
     if (!currentPaging.hasMore || currentPaging.isLoadingMore) return;
@@ -424,6 +473,7 @@ export function AccessibleStationApp() {
       },
     }));
     setError("");
+    startLoading();
 
     try {
       if (activeTab === "announcements") {
@@ -467,6 +517,8 @@ export function AccessibleStationApp() {
           isLoadingMore: false,
         },
       }));
+    } finally {
+      stopLoading();
     }
   };
 
@@ -478,6 +530,7 @@ export function AccessibleStationApp() {
 
     setStatus("Recherche des gares autour de vous.");
     setError("");
+    startLoading();
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
@@ -487,11 +540,14 @@ export function AccessibleStationApp() {
         } catch (cause) {
           setError(readableError(cause, "Recherche autour de vous indisponible. Réessayez dans quelques instants."));
           setStatus("");
+        } finally {
+          stopLoading();
         }
       },
       () => {
         setError("Autorisation de géolocalisation refusée ou position indisponible.");
         setStatus("");
+        stopLoading();
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 },
     );
@@ -501,6 +557,7 @@ export function AccessibleStationApp() {
     if (activeTab === "announcements") return [];
     return boards[activeTab];
   }, [activeTab, boards]);
+  const isInitialTabLoading = Boolean(selectedStation && !isTrainDetailsOpen && !loadedTabs[activeTab] && !error);
 
   const clearStationSelection = () => {
     setSelectedStation(null);
@@ -510,6 +567,8 @@ export function AccessibleStationApp() {
     setLoadedTabs(emptyLoadedState());
     setPaging(emptyPagingState());
     setTrackedTrain(null);
+    setIsTrainDetailsOpen(false);
+    setTrackedTrainUpdateAvailable(false);
     setActiveTab("departures");
   };
 
@@ -522,6 +581,8 @@ export function AccessibleStationApp() {
     setLoadedTabs(emptyLoadedState());
     setPaging(emptyPagingState());
     setTrackedTrain(null);
+    setIsTrainDetailsOpen(false);
+    setTrackedTrainUpdateAvailable(false);
     setActiveTab("departures");
   };
 
@@ -533,50 +594,109 @@ export function AccessibleStationApp() {
       item,
       updatedAt: new Date().toISOString(),
     });
+    setActiveTab(type);
+    setIsTrainDetailsOpen(true);
+    setTrackedTrainUpdateAvailable(false);
     setStatus(`Suivi du train ${item.trainNumber ?? "sélectionné"} activé.`);
     setError("");
   };
 
+  const fetchTrackedTrainSnapshot = useCallback(async (currentTrackedTrain: TrackedTrain) => {
+    const items = await stationBoard(currentTrackedTrain.station.id, currentTrackedTrain.type);
+    const refreshedAt = new Date().toISOString();
+    const refreshedItem = items.find((item) => sameTrain(currentTrackedTrain.item, item));
+
+    if (!refreshedItem) {
+      return { items, item: null, refreshedAt };
+    }
+
+    const vehicleJourneyId = refreshedItem.vehicleJourneyId ?? currentTrackedTrain.item.vehicleJourneyId;
+    const itemWithVehicleJourney = vehicleJourneyId
+      ? { ...refreshedItem, vehicleJourneyId }
+      : refreshedItem;
+    const enrichedItem = vehicleJourneyId
+      ? mergeTrainDetails(itemWithVehicleJourney, await trainDetails(vehicleJourneyId))
+      : itemWithVehicleJourney;
+
+    return { items, item: enrichedItem, refreshedAt };
+  }, []);
+
+  useEffect(() => {
+    if (!trackedTrain) {
+      setTrackedTrainUpdateAvailable(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const interval = window.setInterval(async () => {
+      try {
+        const snapshot = await fetchTrackedTrainSnapshot(trackedTrain);
+        if (isCancelled) return;
+
+        setTrackedTrainUpdateAvailable(!snapshot.item || hasTrackedTrainChanged(trackedTrain.item, snapshot.item));
+      } catch {
+        // La vérification de fond ne doit pas remplacer les informations déjà affichées.
+      }
+    }, TRACKED_TRAIN_POLL_INTERVAL_MS);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [fetchTrackedTrainSnapshot, trackedTrain]);
+
+  const openTrackedTrainDetails = useCallback(() => {
+    if (!trackedTrain) return;
+    setActiveTab(trackedTrain.type);
+    setIsTrainDetailsOpen(true);
+    window.setTimeout(() => {
+      document.getElementById("train-tracking-title")?.scrollIntoView({ block: "start" });
+    }, 0);
+  }, [trackedTrain]);
+
   const refreshTrackedTrain = async () => {
     if (!trackedTrain) return;
 
+    startLoading();
     setStatus("Mise à jour du suivi du train.");
     setError("");
 
     try {
-      const items = await stationBoard(trackedTrain.station.id, trackedTrain.type);
+      const snapshot = await fetchTrackedTrainSnapshot(trackedTrain);
       setBoards((currentBoards) => ({
         ...currentBoards,
-        [trackedTrain.type]: items,
+        [trackedTrain.type]: snapshot.items,
       }));
       setLoadedTabs((currentLoadedTabs) => ({
         ...currentLoadedTabs,
         [trackedTrain.type]: true,
       }));
 
-      const refreshedItem = items.find((item) => sameTrain(trackedTrain.item, item));
-      const refreshedAt = new Date().toISOString();
-      if (!refreshedItem) {
-        setTrackedTrain({ ...trackedTrain, updatedAt: refreshedAt });
+      setTrackedTrainUpdateAvailable(false);
+      if (!snapshot.item) {
+        setTrackedTrain({ ...trackedTrain, updatedAt: snapshot.refreshedAt });
         setStatus("Train non retrouvé dans les prochaines informations. Il peut être parti, arrivé ou ne plus être affiché.");
         return;
       }
 
-      const enrichedItem = refreshedItem.vehicleJourneyId
-        ? mergeTrainDetails(refreshedItem, await trainDetails(refreshedItem.vehicleJourneyId))
-        : refreshedItem;
-
       setTrackedTrain({
         ...trackedTrain,
-        item: enrichedItem,
-        updatedAt: refreshedAt,
+        item: snapshot.item,
+        updatedAt: snapshot.refreshedAt,
       });
-      setStatus(`Dernière mise à jour : ${formatTime(refreshedAt)}`);
+      setStatus(`Dernière mise à jour : ${formatTime(snapshot.refreshedAt)}`);
     } catch (cause) {
       setError(readableError(cause, "Suivi du train indisponible. Réessayez dans quelques instants."));
       setStatus("");
+    } finally {
+      stopLoading();
     }
   };
+
+  const trackedTrainLabel = trackedTrain?.item.trainNumber ?? "sélectionné";
+  const trackingStatusButtonText = trackedTrainUpdateAvailable
+    ? `Voir les nouvelles infos du train ${trackedTrainLabel}`
+    : `Voir le train ${trackedTrainLabel} suivi`;
 
   return (
     <div className="page">
@@ -634,7 +754,7 @@ export function AccessibleStationApp() {
           )}
         </div>
 
-        {selectedStation && !trackedTrain && (
+        {selectedStation && !isTrainDetailsOpen && (
           <nav className="header-action-bar" aria-label="Actions de gare">
             <button className="button-secondary compact-button refresh-button" type="button" onClick={refresh}>
               <span className="button-content">
@@ -674,13 +794,33 @@ export function AccessibleStationApp() {
           </nav>
         )}
 
-        <p className="status" role="status" aria-live="polite">
-          {status}
-        </p>
+        <div className="status" role="status" aria-live="polite">
+          {isLoading ? (
+            <span className="loading-status">
+              <span className="loading-spinner" aria-hidden="true" />
+              <span>Chargement en cours</span>
+            </span>
+          ) : trackedTrain && !isTrainDetailsOpen ? (
+            <button
+              className={trackedTrainUpdateAvailable
+                ? "button-secondary compact-button tracking-status-button update-available"
+                : "button-secondary compact-button tracking-status-button"}
+              type="button"
+              onClick={openTrackedTrainDetails}
+            >
+              <span className="button-content">
+                <Clock3 aria-hidden="true" />
+                <span>{trackingStatusButtonText}</span>
+              </span>
+            </button>
+          ) : trackedTrain ? (
+            ""
+          ) : status}
+        </div>
 
       </header>
 
-      {error && !trackedTrain && (
+      {error && !isTrainDetailsOpen && (
         <div className="page-alert">
           <ApiErrorAlert
             title="Service indisponible"
@@ -770,7 +910,7 @@ export function AccessibleStationApp() {
 
       {selectedStation && (
         <section className="station-content" aria-label={`Informations de ${selectedStation.name}`}>
-          {!trackedTrain && (
+          {!isTrainDetailsOpen && (
             <a
               className="button-secondary official-results-link"
               href={OFFICIAL_SNCF_GARES_URL}
@@ -784,20 +924,21 @@ export function AccessibleStationApp() {
             </a>
           )}
 
-          {trackedTrain ? (
+          {trackedTrain && isTrainDetailsOpen ? (
             <TrainTrackingView
               trackedTrain={trackedTrain}
               error={error}
-              onBack={() => setTrackedTrain(null)}
+              hasPendingUpdate={trackedTrainUpdateAvailable}
+              onBack={() => setIsTrainDetailsOpen(false)}
               onRefresh={refreshTrackedTrain}
             />
           ) : activeTab === "announcements" ? (
-            <AnnouncementList announcements={announcements} />
+            <AnnouncementList announcements={announcements} isLoading={isInitialTabLoading} />
           ) : (
-            <BoardList items={visibleBoard} type={activeTab} onFollow={followTrain} />
+            <BoardList items={visibleBoard} type={activeTab} isLoading={isInitialTabLoading} onFollow={followTrain} />
           )}
 
-          {!trackedTrain && loadedTabs[activeTab] && (
+          {!isTrainDetailsOpen && loadedTabs[activeTab] && (
             <div className="load-more" ref={loadMoreRef}>
               {paging[activeTab].hasMore ? (
                 <button
@@ -806,7 +947,12 @@ export function AccessibleStationApp() {
                   disabled={paging[activeTab].isLoadingMore}
                   onClick={loadMore}
                 >
-                  {paging[activeTab].isLoadingMore ? "Chargement en cours" : "Charger plus"}
+                  {paging[activeTab].isLoadingMore ? (
+                    <span className="button-content">
+                      <span className="loading-spinner" aria-hidden="true" />
+                      <span>Chargement en cours</span>
+                    </span>
+                  ) : "Charger plus"}
                 </button>
               ) : (
                 <p className="muted">Tous les résultats disponibles sont affichés.</p>
@@ -822,80 +968,109 @@ export function AccessibleStationApp() {
 function BoardList({
   items,
   type,
+  isLoading,
   onFollow,
 }: {
   items: BoardItem[];
   type: BoardType;
+  isLoading: boolean;
   onFollow: (item: BoardItem, type: BoardType) => void;
 }) {
+  if (isLoading) return <ContentLoadingIndicator />;
   if (items.length === 0) return <p className="muted">Aucune information à afficher pour le moment.</p>;
 
   return (
     <ul className="board-list" aria-label={type === "departures" ? "Tableau des départs" : "Tableau des arrivées"}>
-      {items.map((item, index) => (
-        <li className="board-item" key={`${type}-${item.id}-${index}`}>
-          <button
-            className="board-card-button"
-            type="button"
-            aria-label={item.trainNumber ? `Ouvrir le détail du train ${item.trainNumber}` : "Ouvrir le détail du train"}
-            onClick={() => onFollow(item, type)}
-          >
-            <div className="board-topline">
-              <div>
-                <p className="destination">
-                  {type === "arrivals"
-                    ? item.origin ?? "Gare de départ non communiquée"
-                    : item.destination ?? "Destination non communiquée"}
-                </p>
-                <p className="muted">{item.line ?? "Ligne non communiquée"}</p>
+      {items.map((item, index) => {
+        const delay = delayMinutes(item);
+        const hasRealtimeTime = Boolean(item.expectedTime && item.expectedTime !== item.time);
+
+        return (
+          <li className="board-item" key={`${type}-${item.id}-${index}`}>
+            <button
+              className="board-card-button"
+              type="button"
+              aria-label={item.trainNumber ? `Ouvrir le détail du train ${item.trainNumber}` : "Ouvrir le détail du train"}
+              onClick={() => onFollow(item, type)}
+            >
+              <div className="board-topline">
+                <div>
+                  <p className="destination">
+                    {type === "arrivals"
+                      ? item.origin ?? "Gare de départ non communiquée"
+                      : item.destination ?? "Destination non communiquée"}
+                  </p>
+                  <p className="muted">{item.line ?? "Ligne non communiquée"}</p>
+                </div>
+                <div className="board-time">
+                  {hasRealtimeTime && (
+                    <span className="initial-time">
+                      <span className="initial-time-label">Initialement prévue</span>
+                      <time className="time original-time" dateTime={item.time}>
+                        {formatTime(item.time)}
+                      </time>
+                      <span className="sr-only">Nouvel horaire </span>
+                    </span>
+                  )}
+                  <time className={hasRealtimeTime ? "time updated-time" : "time"} dateTime={item.expectedTime ?? item.time}>
+                    {formatTime(item.expectedTime ?? item.time)}
+                  </time>
+                </div>
               </div>
-              <time className="time" dateTime={item.time}>
-                {formatTime(item.time)}
-              </time>
-            </div>
-            <div className="meta">
-              <span className="tag">Voie {item.platform ?? "non communiquée"}</span>
-              {delayMinutes(item) !== null && (
-                <span className="tag warning">
-                  <span className="tag-content">
-                    <Clock3 aria-hidden="true" />
-                    <span>
-                      {type === "arrivals" ? "Arrivée retardée" : "Départ retardé"}
-                      {delayMinutes(item) !== null ? ` de ${delayMinutes(item)} min` : ""}
-                      {item.expectedTime ? ` - nouvel horaire ${formatTime(item.expectedTime)}` : ""}
+              <div className="meta">
+                <span className="tag">Voie {item.platform ?? "non communiquée"}</span>
+                {delay !== null && (
+                  <span className="tag warning">
+                    <span className="tag-content">
+                      <Clock3 aria-hidden="true" />
+                      <span>
+                        {type === "arrivals" ? "Arrivée retardée" : "Départ retardé"}
+                        {` de ${delay} min`}
+                      </span>
                     </span>
                   </span>
-                </span>
-              )}
-              {item.status !== "delayed" && (
-                <span className={`tag ${item.status === "cancelled" ? "danger" : item.status === "disrupted" ? "warning" : ""}`}>
-                  <span className="tag-content">
-                    <StatusIcon status={item.status} />
-                    <span>{statusLabel[item.status]}</span>
+                )}
+                {item.status !== "delayed" && (
+                  <span className={`tag ${item.status === "cancelled" ? "danger" : item.status === "disrupted" ? "warning" : ""}`}>
+                    <span className="tag-content">
+                      <StatusIcon status={item.status} />
+                      <span>{statusLabel[item.status]}</span>
+                    </span>
                   </span>
-                </span>
-              )}
-            </div>
-            {item.disruptions.map((disruption, index) => (
-              <p className="muted board-disruption" key={`${disruption.id}-${index}`}>
-                {disruption.title}
-              </p>
-            ))}
-          </button>
-        </li>
-      ))}
+                )}
+              </div>
+              {item.disruptions.map((disruption, index) => (
+                <p className="muted board-disruption" key={`${disruption.id}-${index}`}>
+                  {disruption.title}
+                </p>
+              ))}
+            </button>
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+function ContentLoadingIndicator() {
+  return (
+    <div className="content-loading" role="status" aria-live="polite">
+      <span className="loading-spinner" aria-hidden="true" />
+      <span>Chargement en cours</span>
+    </div>
   );
 }
 
 function TrainTrackingView({
   trackedTrain,
   error,
+  hasPendingUpdate,
   onBack,
   onRefresh,
 }: {
   trackedTrain: TrackedTrain;
   error: string;
+  hasPendingUpdate: boolean;
   onBack: () => void;
   onRefresh: () => void;
 }) {
@@ -950,12 +1125,12 @@ function TrainTrackingView({
 
       <header className="tracking-header">
         <div className="tracking-train-identity" aria-label="Train">
-          <h2>{trainName}</h2>
+          <h2 id="train-tracking-title">{trainName}</h2>
         </div>
         <div className="tracking-route-cards" aria-labelledby="train-tracking-title">
           <div className="tracking-route-card">
             <span>Départ</span>
-            <strong id="train-tracking-title">{departurePlace ?? "Non communiqué"}</strong>
+            <strong>{departurePlace ?? "Non communiqué"}</strong>
           </div>
           <div className="tracking-route-card">
             <span>Arrivée</span>
@@ -963,6 +1138,16 @@ function TrainTrackingView({
           </div>
         </div>
       </header>
+
+      {hasPendingUpdate && (
+        <div className="tracking-update-hint" role="status" aria-live="polite">
+          <span className="tracking-alert-title">
+            <Info aria-hidden="true" />
+            <span>Mise à jour disponible</span>
+          </span>
+          <p>De nouvelles informations sont disponibles. Cliquez sur Actualiser pour les afficher.</p>
+        </div>
+      )}
 
       <div className="tracking-summary-cards">
         <div className="tracking-summary-card" aria-label={type === "arrivals" ? "Heure d'arrivée" : "Heure de départ"}>
@@ -972,7 +1157,10 @@ function TrainTrackingView({
               : hasRealtimeTime ? "Départ retardé" : "Départ"}
           </span>
           {hasRealtimeTime && (
-            <time className="original-time" dateTime={item.time}>{formatTime(item.time)}</time>
+            <span className="initial-time">
+              <span className="initial-time-label">Initialement prévue</span>
+              <time className="original-time" dateTime={item.time}>{formatTime(item.time)}</time>
+            </span>
           )}
           <time dateTime={item.expectedTime ?? item.time}>{formatTime(item.expectedTime ?? item.time)}</time>
         </div>
@@ -1073,13 +1261,14 @@ function ApiErrorAlert({
   );
 }
 
-function AnnouncementList({ announcements }: { announcements: Announcement[] }) {
+function AnnouncementList({ announcements, isLoading }: { announcements: Announcement[]; isLoading: boolean }) {
   const speak = (text: string) => {
     if (!("speechSynthesis" in window)) return;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
   };
 
+  if (isLoading) return <ContentLoadingIndicator />;
   if (announcements.length === 0) return <p className="muted">Aucune alerte prioritaire pour le moment.</p>;
 
   return (

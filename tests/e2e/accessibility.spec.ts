@@ -302,7 +302,7 @@ test("un rechargement navigateur conserve la gare et l'onglet courant", async ({
   await expect(page.getByText("Marseille Saint-Charles", { exact: true })).toBeVisible();
 });
 
-test("les départs se chargent depuis maintenant moins cinq minutes avec pagination", async ({ page }) => {
+test("les départs se chargent depuis maintenant avec pagination", async ({ page }) => {
   const requestedPages: string[] = [];
   const requestedFromDateTimes: Array<string | null> = [];
 
@@ -349,11 +349,13 @@ test("les départs se chargent depuis maintenant moins cinq minutes avec paginat
 
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
+  const beforeStationSelection = Date.now();
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
 
   await expect(page.getByText("Destination 1", { exact: true })).toBeVisible();
   expect(requestedPages[0]).toBe("0");
   expect(requestedFromDateTimes[0]).toBeTruthy();
+  expect(new Date(requestedFromDateTimes[0] ?? "").getTime()).toBeGreaterThanOrEqual(beforeStationSelection - 1_000);
 
   await page.getByRole("button", { name: "Charger plus" }).click();
   await expect(page.getByText("Destination 22", { exact: true })).toBeVisible();
@@ -405,16 +407,20 @@ test("un train retardé affiche l'heure prévue et le nouvel horaire dans les li
   await page.getByRole("button", { name: "Nancy", exact: true }).click();
 
   const departureCard = page.locator(".board-item").first();
-  await expect(departureCard.locator(".time")).toHaveText("13:40");
+  await expect(departureCard.locator(".board-time .initial-time")).toContainText("Initialement prévue");
+  await expect(departureCard.locator(".board-time .original-time")).toHaveText("13:40");
+  await expect(departureCard.locator(".board-time .updated-time")).toHaveText("14:40");
   await expect(departureCard).toContainText("Départ retardé");
-  await expect(departureCard).toContainText("nouvel horaire 14:40");
+  await expect(departureCard).toContainText("de 60 min");
   await expect(departureCard.locator(".tag", { hasText: /^Retard$/ })).toHaveCount(0);
 
   await page.getByRole("tab", { name: "Arrivées" }).click();
   const arrivalCard = page.locator(".board-item").first();
-  await expect(arrivalCard.locator(".time")).toHaveText("13:40");
+  await expect(arrivalCard.locator(".board-time .initial-time")).toContainText("Initialement prévue");
+  await expect(arrivalCard.locator(".board-time .original-time")).toHaveText("13:40");
+  await expect(arrivalCard.locator(".board-time .updated-time")).toHaveText("14:40");
   await expect(arrivalCard).toContainText("Arrivée retardée");
-  await expect(arrivalCard).toContainText("nouvel horaire 14:40");
+  await expect(arrivalCard).toContainText("de 60 min");
   await expect(arrivalCard.locator(".tag", { hasText: /^Retard$/ })).toHaveCount(0);
 });
 
@@ -469,8 +475,10 @@ test("un train peut être suivi puis actualisé sur une page dédiée", async ({
   await page.goto("/");
   await page.getByLabel("Nom de gare").fill("Lyon");
   await page.getByRole("button", { name: /lyon part dieu/i }).click();
+  await page.clock.install({ time: new Date("2026-06-20T12:00:00+02:00") });
 
   await page.getByRole("button", { name: "Ouvrir le détail du train 876543" }).click();
+  await expect(page.getByRole("button", { name: "Voir le train 876543 suivi" })).toHaveCount(0);
   await expect(page.getByRole("heading", { level: 2, name: "TER - Train 876543" })).toBeVisible();
   await expect(page.locator(".tracking-route-cards").getByText("Lyon Part Dieu")).toBeVisible();
   await expect(page.locator(".tracking-route-cards").getByText("Arrivée")).toBeVisible();
@@ -482,6 +490,21 @@ test("un train peut être suivi puis actualisé sur une page dédiée", async ({
   await expect(page.getByText("Dijon Ville")).toBeVisible();
   await expect(page.getByRole("region", { name: "Plan voitures et reperes" })).not.toBeVisible();
 
+  await page.getByRole("button", { name: "Retour" }).click();
+  await expect(page.getByRole("button", { name: "Ouvrir le détail du train 876543" })).toBeVisible();
+  await page.getByRole("button", { name: "Voir le train 876543 suivi" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "TER - Train 876543" })).toBeVisible();
+
+  await page.clock.fastForward("01:00");
+  await expect(page.getByRole("button", { name: "Voir les nouvelles infos du train 876543" })).toHaveCount(0);
+  await expect(page.getByText("Mise à jour disponible")).toBeVisible();
+  await expect(page.getByText("De nouvelles informations sont disponibles. Cliquez sur Actualiser pour les afficher.")).toBeVisible();
+  await expect(page.getByLabel("Heure de départ")).not.toContainText("Départ retardé");
+
+  await page.getByRole("button", { name: "Retour" }).click();
+  await page.getByRole("button", { name: "Voir les nouvelles infos du train 876543" }).click();
+  await expect(page.getByText("Mise à jour disponible")).toBeVisible();
+
   await page.getByRole("button", { name: "Actualiser" }).click();
   const importantInformation = page.getByRole("region", { name: "Informations importantes du train" });
   await expect(importantInformation).toBeVisible();
@@ -489,9 +512,11 @@ test("un train peut être suivi puis actualisé sur une page dédiée", async ({
   await expect(importantInformation).toContainText("Retard estimé : 10 minutes.");
   await expect(importantInformation).toContainText("Retard estimé à 10 minutes.");
   await expect(page.getByLabel("Heure de départ")).toContainText("Départ retardé");
+  await expect(page.getByLabel("Heure de départ")).toContainText("Initialement prévue");
   await expect(page.getByLabel("Heure de départ")).toContainText("14:08");
   await expect(page.getByLabel("Heure de départ")).toContainText("14:18");
   await expect(page.getByLabel("Voie du train")).toContainText("7");
+  await expect(page.getByText("Mise à jour disponible")).not.toBeVisible();
 
   await page.getByRole("button", { name: "Retour" }).click();
   await expect(page.getByRole("button", { name: "Ouvrir le détail du train 876543" })).toBeVisible();
